@@ -231,7 +231,7 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                              'val_acc': val_result['img_acc']},
                             is_best, os.path.join(save_path, 'weight.pth.tar'))
         model.train()
-        print('Epoch: {}, Eval time consumed: {:0.4f}, Val patch acc: {:0.6f}, Val image acc: {:0.6f}, Best val acc: {:0.6f}'.format(
+        print('Epoch: {}, Eval time consumed: {:0.4f}s, Val patch acc: {:0.6f}, Val image acc: {:0.6f}, Best val acc: {:0.6f}'.format(
             epoch,
             time.time() - eval_start,
             val_result['patch_acc'],
