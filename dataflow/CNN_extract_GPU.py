@@ -2,7 +2,8 @@
 import numpy as np
 import os
 import sys
-sys.path.append('../')
+#sys.path.append('../')
+sys.path.append(os.getcwd())
 from skimage.measure import regionprops
 from skimage.filters.rank import entropy as Entropy
 from skimage.morphology import disk,remove_small_objects
