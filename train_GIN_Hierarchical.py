@@ -154,7 +154,6 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
     device = 'cuda:1' if torch.cuda.device_count()>1 else 'cuda:0'
     start_epoch = 0
     optimizer = init_optim(args.optim, model.parameters(), args.lr, args.weight_decay)
-    print(checkpoint)
     if checkpoint is not None:
         optimizer.load_state_dict(checkpoint['optimizer'])
         start_epoch = checkpoint['epoch']
@@ -162,7 +161,6 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
     if args.step_size > 0:
         scheduler = lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
     cudnn.benchmark = True
-    #iter = 0
     val_result={
             'epoch': 0,
             'loss': 0,
@@ -184,7 +182,6 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
     test_epochs = []
     val_accs = []
     save_path = os.path.join(args.resultdir, gen_prefix(args), TIME_NOW)
-    #print(save_path)
     train_iter =  0
     for epoch in range(start_epoch, args.num_epochs):
         epoch_start = time.time()
@@ -192,50 +189,15 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
         total_time = 0
         avg_loss = 0.0
         model.train()
-        #print('Epoch: ', epoch)
-        # print("type dataset: " + str(type(dataset)))
         dataset.dataset.set_epoch(epoch)
 
-        #with tqdm(bar_format='{desc}{postfix}') as tq:
-            #for batch_idx, data in enumerate(tqdm(dataset)):
-
-        #total_per_epoch = time.time()
-        #start = time.time()
-        #total_data_loading = 0
-        #total_training = 0
-        #total_evaling = 0
-
-        #tmp_data_loading_start = time.time()
-        #total_evaling = time.time()
-        #total_per_iter_start = time.time()
         for batch_idx, data in enumerate(dataset):
-            #tmp_data_loading_finish = time.time() - tmp_data_loading_start
-            #train_iter += 40
-            #begin_time = time.time()
-            #tmp_training_start = time.time()
-            # data is list type, 里面存的是图数据，包括坐标等等
-            # data = np.squeeze(data)
-            # print("data type " + str(type(data)))
-            # print("data shape " + str(data.shape))
-            # print(data)
-            # print("data length :" + str(len(data)))
             _, cls_loss = model(data)
-            # data = data.requires_grad_()
-            # _, cls_loss = cp.checkpoint(model, data)
             cls_loss = torch.mean(cls_loss)
             loss =  cls_loss
-            # loss.requires_grad = True
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            #tmp_training_finish = time.time() - tmp_training_start
-            #iter += 1
-            #tmp_eval_start = time.time()
-            #if train_iter%(3500 ) == 0:
-            #print('loss', loss.item(), 'epoch', epoch, 'batch_idx', batch_idx, 'lr', )
-            #if batch_idx == len(dataset) - 1:
-            #if True:
-            #print('before eval')
 
             print('Training Loss:{:0.4f}, Epoch: {epoch}, Batch: [{batch_idx}/{total}] LR:{:0.6f}'.format(
                 loss.item(),
@@ -245,16 +207,6 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                 total=len(dataset)
             ))
 
-
-            #print('Time:%f, Train loss:%f, Val patch acc:%f img acc:%f  | Best Val acc:%f in epoch%d'
-            #  % (total_time,
-
-            #     loss.detach().cpu().item(),
-            #     val_result['img_acc'],
-            #     best_val_result['patch_acc'],
-            #     best_val_result['img_acc'],
-            #     best_val_result['epoch']
-            #     ))
         if args.step_size > 0:
             scheduler.step()
 
@@ -287,66 +239,6 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
             best_val_result['img_acc']
         ))
 
-
-            #print('done')
-
-            #tmp_eval_finish = time.time() - tmp_eval_start
-
-            #tmp_data_loading_start = time.time()
-
-            #tmp_total = tmp_data_loading_finish + tmp_eval_finish + tmp_training_finish
-
-            #total_per_iter_finish = time.time() - total_per_iter_start
-            #print('epoch, batch_idx, batch_len, total_time, loss: ', epoch, batch_idx, len(dataset), time.time() - total_per_epoch, loss)
-            #print('iter data_loaindg: {:02f}s, training: {:0.2f}s, eval: {:0.2f}s, total1 {:0.2f}s, total2 {:0.2f}s'.format(
-            #    tmp_data_loading_finish / tmp_total,
-            #    tmp_training_finish / tmp_total,
-            #    tmp_eval_finish / tmp_total,
-            #    tmp_total,
-            #    total_per_iter_finish
-            #    )
-            #)
-        #avg_loss += loss.detach()
-        #elapsed = time.time() - begin_time
-        #total_time += elapsed
-
-            #total_per_iter_start = time.time()
-                #if iter % 2 == 0:
-                #    tq.set_description('Processing iter=%d'%iter)
-                #    if args.method in ['soft-assign','deep-soft-assign', 'soft-assign-jk']:
-                #        tq.set_postfix({'overall':  loss.item(),
-                #                        'cls': cls_loss.item(),}
-                #                        )
-                #    else:
-                #        tq.set_postfix({'overall':  loss.item(),
-                #                        })
-        # decay lr
-        #import sys
-        #sys.exit()
-        #epoch_finish = time.time()
-
-        #if args.step_size > 0: scheduler.step()
-        #avg_loss /= batch_idx + 1
-        #if writer is not None:
-        #    writer.add_scalar('loss/avg_loss', avg_loss, epoch)
-        #if test_dataset is not None:
-        #    test_result = evaluate(test_dataset, model, args, name='Test')
-        #    test_result['epoch'] = epoch
-        #    print(test_result)
-        ##if writer is not None:
-        ##    # writer.add_scalar('acc/train_acc', train_result['img_acc'], epoch)
-        ##    writer.add_scalar('acc/val_acc', val_result['img_acc'], epoch)
-        ##    writer.add_scalar('loss/best_val_loss', best_val_result['loss'], epoch)
-        ##    if test_dataset is not None:
-        ##        writer.add_scalar('acc/test_acc', test_result['img_acc'], epoch)
-
-
-        ##best_val_epochs.append(best_val_result['epoch'])
-        ##best_val_accs.append(best_val_result['img_acc'])
-        #if test_dataset is not None:
-        #    print('Test result: ', test_result)
-        #    test_epochs.append(test_result['epoch'])
-        #    test_accs.append(test_result['img_acc'])
     return model, val_accs
 
 def cell_graph(args, writer = None):
@@ -536,26 +428,7 @@ def arg_parse():
 def main():
     prog_args = arg_parse()
     torch.backends.cudnn.benchmark = True
-    #log_path = os.path.join(prog_args.logdir, gen_prefix(prog_args), TIME_NOW)
-    #result_path = os.path.join(prog_args.resultdir, gen_prefix(prog_args), TIME_NOW)
-    #data_setting = DataSetting()
-
-    #print(log_path, result_path)
-    #writer = SummaryWriter(log_dir=log_path)
     cell_graph(prog_args)
-    # mkdirs(log_path)
-    # mkdirs(result_path)
-    # if prog_args.visualization:
-    #     visual_path = os.path.join(prog_args.resultdir, gen_prefix(prog_args), 'visual')
-    #     mkdirs(visual_path)
-    # if not prog_args.skip_train:
-    #     with open(os.path.join(result_path,'args.txt'), 'w') as f:
-    #         json.dump(prog_args.__dict__, f, indent=2)
-    #
-    # writer = SummaryWriter(log_path)
-    # cell_graph(prog_args, writer=writer, )
-    # writer.close()
-
 
 if __name__ == "__main__":
     torch.multiprocessing.set_sharing_strategy('file_system')
