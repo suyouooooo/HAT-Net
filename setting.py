@@ -7,9 +7,10 @@ class CrossValidSetting:
         self.sample_time = 1
         self.sample_ratio = 1
         self.root = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning'#'/research/dept6/ynzhou/gcnn/data'
-        self.save_path = '/home/suyihan/PycharmProjects/CGC-Net/output/AGS'
+        self.save_path = 'output'
         self.log_path = os.path.join(self.save_path,'log' )
         self.result_path = os.path.join(self.save_path, 'result')
         self.dataset = 'CRC'
         self.max_edge_distance = 100
         self.max_num_nodes = 11404 # the maximum number of nodes in one graph
+        self.log_dir = 'runs'
