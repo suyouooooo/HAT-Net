@@ -84,7 +84,13 @@ def prepare_train_val_loader(args):
 
     setting = CrossValidSetting()
     sampler_type = None
-    train_dataset_loader = DataListLoader(NucleiDatasetBatchOutput(
+    if args.load_data_list:
+        data_loader = DataListLoader
+    else:
+        data_loader = DataLoader
+    #train_dataset_loader = DataListLoader(NucleiDatasetBatchOutput(
+    #train_dataset_loader = DataLoader(NucleiDatasetBatchOutput(
+    train_dataset_loader = data_loader(NucleiDatasetBatchOutput(
         root=setting.root,
         feature_type=args.feature_type,
         split='train', sampling_time=setting.sample_time,
@@ -98,7 +104,7 @@ def prepare_train_val_loader(args):
         sampler=sampler_type,
         batch_size=args.batch_size,
         shuffle=True if sampler_type is None else False,
-        num_workers=args.num_workers,
+        num_workers=args.num_workers
     )
 
     validset = NucleiDatasetBatchOutput(root=setting.root,
@@ -113,11 +119,14 @@ def prepare_train_val_loader(args):
                                         neighbour=args.neighbour,
                                         graph_sampler=args.graph_sampler, crossval=args.cross_val)
 
-    val_dataset_loader = DataListLoader(
+    #val_dataset_loader = DataListLoader(
+    print('num of workers', args.num_workers)
+    #val_dataset_loader = DataLoader(
+    val_dataset_loader = data_loader(
         validset,
         batch_size=args.batch_size,  # setting.batch_size,
         shuffle=False,
-        num_workers=args.num_workers, pin_memory=True
+        num_workers=args.num_workers
     )
 
     if not args.visualization:
@@ -148,6 +157,7 @@ class NucleiDataset(Dataset):
     @property
     def processed_dir(self):
         return self._processed_dir
+
 
     def __init__(self, root,  feature_type, transform=None, pre_transform=None, split = 'train',
                  sampling_time = 10, sampling_ratio = 0.5, normalize = False, dynamic_graph = False, sampling_method = 'farthest',
