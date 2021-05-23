@@ -61,11 +61,20 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
                     finaleval.patch_result(patch_name, torch.max(ypred, 1)[1].cpu().numpy())
 
                 else:
-                    patch_name = [dataset.dataset.idxlist[d.patch_idx.item()] for d in data]
+                    if args.load_data_list:
+                        patch_name = [dataset.dataset.idxlist[d.patch_idx.item()] for d in data]
+                        label = torch.cat([d.y for d in data]).numpy()
+                    else:
+                        patch_name = [dataset.dataset.idxlist[patch_idx.item()] for patch_idx in data.patch_idx]
+                        data.to('cuda:0')
+                        label = data.y.cpu().numpy()
+                        #label = torch.cat([d.y for d in data]).numpy()
+
                     ypred = model(data)
                     #print(ypred.shape)
-                    label = torch.cat([d.y for d in data]).numpy()
-                    #print(label.shape)
+                    #print(data.y)
+                    #label = torch.cat([d.y for d in data]).numpy()
+                    #label = data.y.cpu().numpy()
                     labels.append(label)
                     finaleval.batch_patch_result(patch_name, torch.max(ypred, 1)[1].cpu().numpy())
                 _, indices = torch.max(ypred, 1)
@@ -148,8 +157,32 @@ def gen_prefix(args):
         name +='_cv'+str(args.cross_val)
     return name
 
+def eval_idx(total_iters, num_evals):
+    interval = total_iters // num_evals
+    first_interval = total_iters - interval * num_evals + interval - 1
+    intervals = []
+    intervals.append(first_interval)
+    for i in range(num_evals - 1):
+        intervals.append(interval + intervals[-1])
+
+    return intervals
+
+#def eval_idx(total_iters, num_evals):
+#    interval = total_iters // num_evals -
+#    print(interval)
+#    first_interval = total_iters - interval * num_evals
+#    intervals = []
+#    intervals.append(first_interval - 1)
+#    for i in range(num_evals):
+#        intervals.append(interval + intervals[-1] )
+#
+#    print(intervals)
+#    return intervals
 
 def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=None, checkpoint = None):
+    print('train data loader type', type(dataset))
+    print('val data loader type', type(val_dataset))
+    print('model type', type(model))
     print("==> Start training")
     device = 'cuda:1' if torch.cuda.device_count()>1 else 'cuda:0'
     start_epoch = 0
@@ -182,7 +215,18 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
     test_epochs = []
     val_accs = []
     save_path = os.path.join(args.resultdir, gen_prefix(args), TIME_NOW)
-    train_iter =  0
+    #num_eval = args.num_eval
+    #iter_num = len(dataset) // num_eval
+    #idxes = eval_idx(len(dataset), args.num_eval)
+    #print(idxes)
+
+    #import sys
+    #sys.exit()
+    print(model)
+    #import sys
+    #sys.exit()
+    #print()
+    eval_idxes = eval_idx(len(dataset), args.num_eval)
     for epoch in range(start_epoch, args.num_epochs):
         epoch_start = time.time()
         torch.cuda.empty_cache()
@@ -192,9 +236,16 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
         dataset.dataset.set_epoch(epoch)
 
         for batch_idx, data in enumerate(dataset):
+            #print(data[0].x.device, type(model))
+            if batch_idx < 200:
+                continue
+            if not args.load_data_list:
+                data.to(device)
+            #print(data.y)
+            #print(data.patch_idx)
             _, cls_loss = model(data)
             cls_loss = torch.mean(cls_loss)
-            loss =  cls_loss
+            loss = cls_loss
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -204,39 +255,43 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                 optimizer.param_groups[0]['lr'],
                 epoch=epoch,
                 batch_idx=batch_idx,
-                total=len(dataset)
+                total=len(dataset) - 1
             ))
+
+
+            #print(eval_idxes)
+            if batch_idx in eval_idxes:
+                eval_start = time.time()
+                print('Evaluating at {}th iterations.......'.format(batch_idx))
+                #print(eval_idxes)
+                val_result = evaluate(val_dataset, model, args, name='Validation')
+                val_accs.append(val_result['patch_acc'])
+                if val_result['img_acc'] > best_val_result['img_acc'] - 1e-7:
+                    best_val_result['patch_acc'] = val_result['patch_acc']
+                    best_val_result['img_acc'] =  val_result['img_acc']
+                    best_val_result['epoch'] = epoch
+                    is_best = True
+                    print('Saveing best weight file to {}'.format(save_path))
+                    save_checkpoint({'epoch': epoch + 1,
+                                     'loss': avg_loss,
+                                     'state_dict': model.state_dict() if torch.cuda.device_count() < 2 else model.module.state_dict(),
+                                     'optimizer': optimizer.state_dict(),
+                                     'val_acc': val_result['img_acc']},
+                                    is_best, os.path.join(save_path, 'weight.pth.tar'))
+                model.train()
+                print('Epoch: {}, Eval time consumed: {:0.4f}s, Val patch acc: {:0.6f}, Val image acc: {:0.6f}, Best val acc: {:0.6f}'.format(
+                    epoch,
+                    time.time() - eval_start,
+                    val_result['patch_acc'],
+                    val_result['img_acc'],
+                    best_val_result['img_acc']
+                ))
 
         if args.step_size > 0:
             scheduler.step()
 
         print('training time consumed:{:2f}s'.format(
             time.time() - epoch_start
-        ))
-
-        eval_start = time.time()
-        print('Evaluating.......')
-        val_result = evaluate(val_dataset, model, args, name='Validation')
-        val_accs.append(val_result['patch_acc'])
-        if val_result['img_acc'] > best_val_result['img_acc'] - 1e-7:
-            best_val_result['patch_acc'] = val_result['patch_acc']
-            best_val_result['img_acc'] =  val_result['img_acc']
-            best_val_result['epoch'] = epoch
-            is_best = True
-            print('Saveing best weight file to {}'.format(save_path))
-            save_checkpoint({'epoch': epoch + 1,
-                             'loss': avg_loss,
-                             'state_dict': model.state_dict() if torch.cuda.device_count() < 2 else model.module.state_dict(),
-                             'optimizer': optimizer.state_dict(),
-                             'val_acc': val_result['img_acc']},
-                            is_best, os.path.join(save_path, 'weight.pth.tar'))
-        model.train()
-        print('Epoch: {}, Eval time consumed: {:0.4f}s, Val patch acc: {:0.6f}, Val image acc: {:0.6f}, Best val acc: {:0.6f}'.format(
-            epoch,
-            time.time() - eval_start,
-            val_result['patch_acc'],
-            val_result['img_acc'],
-            best_val_result['img_acc']
         ))
 
     return model, val_accs
@@ -254,7 +309,10 @@ def cell_graph(args, writer = None):
         input_dim, args.hidden_dim, args.output_dim, True, True, args.hidden_dim,  args.num_classes,
                                           args.assign_ratio,[50], concat= True,
                                           gcn_name= args.gcn_name,collect_assign=args.visualization,
-                                          load_data_sparse=(args.load_data_list and not args.visualization),
+                                          #load_data_sparse=(args.load_data_list and not args.visualization),
+                                          #load_data_sparse=args.load_data_sparse,
+                                          #load_data_sparse=(not args.load_data_list),
+                                          load_data_sparse=True,
                                           norm_adj=args.norm_adj, activation=args.activation, drop_out=args.drop_out,
                                           jk=args.jump_knowledge,
                                           depth=args.depth,
@@ -285,6 +343,7 @@ def cell_graph(args, writer = None):
             model = DataParallel(model).cuda()
         else:
             model = model.cuda()
+    #print(type(model))
     if not args.skip_train:
         # 如果不跳过训练，就执行下面的操作
         if args.resume:
@@ -363,8 +422,10 @@ def arg_parse():
     parser.add_argument('--skip_train', action='store_const',
                         const=True, default=False, help='only do evaluation')
     parser.add_argument('--normalize', default=False, help='normalize the adj matrix or not')
-    parser.add_argument('--load_data_list', action='store_true', default=True)
-    parser.add_argument('--load_data_sparse', action='store_true', default=False)
+    #parser.add_argument('--load_data_list', action='store_true', default=True)
+    #parser.add_argument('--load_data_sparse', action='store_true', default=False)
+    parser.add_argument('--load_data_list', action='store_true')
+    parser.add_argument('--load_data_sparse', action='store_true')
     parser.add_argument('--name', default='fuse')
     parser.add_argument('--gcn_name', default='SAGE')
     parser.add_argument('--active', dest='activation', default='relu')
@@ -389,6 +450,7 @@ def arg_parse():
 
     parser.add_argument('--depth', default=None, type=int)
     parser.add_argument('--stage', nargs='*', type=int)
+    parser.add_argument('--num_eval', default=1, type=int)
 
     parser.set_defaults(datadir=data_setting.root,
                         logdir=data_setting.log_path,
@@ -402,7 +464,7 @@ def arg_parse():
                         clip=2.0,
                         batch_size=40,
                         num_epochs=30,
-                        num_workers=4,
+                        num_workers=2,
                         input_dim=10,
                         hidden_dim=20,
                         output_dim=20,
@@ -427,9 +489,11 @@ def arg_parse():
 
 def main():
     prog_args = arg_parse()
-    torch.backends.cudnn.benchmark = True
+    #torch.backends.cudnn.benchmark = True
+    print(prog_args)
     cell_graph(prog_args)
 
 if __name__ == "__main__":
-    torch.multiprocessing.set_sharing_strategy('file_system')
+    #torch.multiprocessing.set_sharing_strategy('file_system')
+    print('shared strategy', torch.multiprocessing.get_sharing_strategy())
     main()
