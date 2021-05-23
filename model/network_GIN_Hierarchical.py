@@ -365,6 +365,7 @@ class SoftPoolingGcnEncoder(nn.Module):
         # print("stage 0: " + str(x.size()))
         # print("stage 0 adj: " + str(adj.size()))
 
+        #print(adj.device, embedding_mask.device)
 
         # stage 1
         if self.norm_adj:
@@ -400,7 +401,6 @@ class SoftPoolingGcnEncoder(nn.Module):
         assign = self.GCN_pool_2(x, adj, None)
 
         x, adj,mincut_loss, ortho_loss, num_nodes = self.dense_mincut_pool(embed_feature, adj, assign, None)
-        #print(x.shape, 1)
 
         #if self.stage is not None and 2 in self.stage:
         if len(self.stage) == 2:
@@ -409,11 +409,8 @@ class SoftPoolingGcnEncoder(nn.Module):
             x = self.trans_encoder2(x)
 
         elif 2 in self.stage:
-            #print('stage 2, single', self.trans_encoder)
             x += self.pos_emb
             x = self.trans_encoder(x)
-        # print("stage 2: " + str(x.size()))
-        # print("stage 2 adj: " + str(adj.size()))
         out, _ = torch.max(x, dim=1)
         out_all.append(out)
 
@@ -439,16 +436,12 @@ class SoftPoolingGcnEncoder(nn.Module):
         x, adj, mincut_loss, ortho_loss, num_nodes = self.dense_mincut_pool(embed_feature, adj, assign, None)
 
         if len(self.stage) == 2:
-            #print('stage3, double', self.trans_encoder3)
             #x += self.pos_emb
             x = self.trans_encoder3(x)
         elif 3 in self.stage:
-            #print('stage3, single', self.trans_encoder)
             x += self.pos_emb
             x = self.trans_encoder(x)
 
-        # print("stage 3: " + str(x.size()))
-        # print("stage 3 adj: " + str(adj.size()))
         out, _ = torch.max(x, dim=1)
         out_all.append(out)  # out_all[0].size() torch.Size([1, 20])
         output = torch.cat(out_all, 1) # output.size() torch.Size([1, 60])
