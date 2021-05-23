@@ -1,7 +1,8 @@
 import numpy as np
 import os
 import sys
-sys.path.append('../')
+#sys.path.append('../')
+sys.path.append(os.getcwd())
 from skimage.measure import regionprops
 from skimage.filters.rank import entropy as Entropy
 from skimage.morphology import disk,remove_small_objects
@@ -24,16 +25,16 @@ def euc_dist(name):
     arr_y = (arr[:,1,np.newaxis].T - arr[:,1,np.newaxis])**2
     arr = np.sqrt(arr_x + arr_y)
 
-    np.save(name.replace('coordinate', 'distance'), arr.astype(np.int16))
+    #np.save(name.replace('coordinate', 'distance'), arr.astype(np.int16))
     return 0
 
 class DataSetting:
     def __init__(self, label = 'fold_3/1_normal'):
         self.dataset = 'CRC'
         self.label  = label
-        self.root = '/data/ssd1/syh/PycharmProjects/CGC-Net/data_final/raw'
+        self.root = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/raw'
         self.test_data_path = os.path.join(self.root, self.dataset, self.label)
-        self.save_path = '/data/ssd1/syh/PycharmProjects/CGC-Net/data_final/proto'
+        self.save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_su/proto'
         self.do_eval = False
         self.test_image_list = os.listdir(self.test_data_path)
         self.test_image_list = [f for f in self.test_image_list if 'png' in f]
@@ -78,6 +79,7 @@ def _get_batch_features_new(numpy_queue, info_queue):
             for prop in props:
                 nuc_feats = []
                 bbox = prop.bbox
+                #print(bbox)
                 single_entropy = entropy[bbox[0]: bbox[2]+1, bbox[1]:bbox[3]+1]
                 single_mask = binary_mask[bbox[0]: bbox[2]+1, bbox[1]:bbox[3]+1].astype(np.uint8)
 
@@ -95,6 +97,7 @@ def _get_batch_features_new(numpy_queue, info_queue):
                 area = cv2.contourArea(cnt)
                 hull = cv2.convexHull(cnt)
                 hull_area = cv2.contourArea(hull)
+                #print(area, hull_area)
                 if hull_area == 0:
                     hull_area += 1
                 solidity = float(area)/hull_area
@@ -133,10 +136,12 @@ def _get_batch_features_new(numpy_queue, info_queue):
             else:
                 node_feature = np.vstack(node_feature)
                 node_coordinate = np.vstack(node_coordinate)
+                print(node_feature.shape)
+                print(node_coordinate.shape)
 
                 # 把特征表示和质心表示都存储起来
-                np.save(os.path.join(self.feature_save_path, name), node_feature.astype(np.float32))
-                np.save(os.path.join(self.distance_save_path, name), node_coordinate.astype(np.float32))
+                #np.save(os.path.join(self.feature_save_path, name), node_feature.astype(np.float32))
+                #np.save(os.path.join(self.distance_save_path, name), node_coordinate.astype(np.float32))
 
                 # 计算质心之间的euc_dist
                 euc_dist(os.path.join(self.distance_save_path, name))
