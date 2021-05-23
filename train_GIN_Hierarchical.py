@@ -236,9 +236,6 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
         dataset.dataset.set_epoch(epoch)
 
         for batch_idx, data in enumerate(dataset):
-            #print(data[0].x.device, type(model))
-            if batch_idx < 200:
-                continue
             if not args.load_data_list:
                 data.to(device)
             #print(data.y)
