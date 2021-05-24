@@ -214,6 +214,47 @@ def filter_sampled_indice(indice, num):
     a = list(filter(lambda x:x not in indice, total))
     return a
 
+
+
+@torch.no_grad()
+def visualize_network(writer, net, tensor):
+    tensor = tensor.to(next(net.parameters()).device)
+    writer.add_graph(net, tensor)
+
+def _get_lastlayer_params(net):
+    """get last trainable layer of a net
+    Args:
+        network architectur
+    Returns:
+        last layer weights and last layer bias
+    """
+    last_layer_weights = None
+    last_layer_bias = None
+    for name, para in net.named_parameters():
+        if 'weight' in name:
+            last_layer_weights = para
+        if 'bias' in name:
+            last_layer_bias = para
+
+    return last_layer_weights, last_layer_bias
+
+def visualize_lastlayer(writer, net, n_iter):
+    weights, bias = _get_lastlayer_params(net)
+    writer.add_scalar('LastLayerGradients/grad_norm2_weights', weights.grad.norm(), n_iter)
+    writer.add_scalar('LastLayerGradients/grad_norm2_bias', bias.grad.norm(), n_iter)
+
+def visualize_scalar(writer, name, scalar, n_iter):
+    """visualize scalar"""
+    writer.add_scalar(name, scalar, n_iter)
+
+
+def visualize_param_hist(writer, net, n_iter):
+    """visualize histogram of params"""
+    for name, param in net.named_parameters():
+        layer, attr = os.path.splitext(name)
+        attr = attr[1:]
+        writer.add_histogram("{}/{}".format(layer, attr), param, n_iter)
+
 if __name__ == '__main__':
     # pt_to_gexf('/data/hdd1/syh/PycharmProjects/CGC-Net/data/proto/coordinate/CRC/fold_4/2_low_grade/Patient_001_02_Low-Grade.npy','/data/hdd1/syh/PycharmProjects/CGC-Net/data/proto/fix_fuse_hover_knn/0/fold_1/1_normal')
     # pt_to_gexf('/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/proto/coordinate/CRC/fold_1/1_normal/H09-00804_A2H_E_1_2_grade_1_2241_4033.npy','/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/gexf')

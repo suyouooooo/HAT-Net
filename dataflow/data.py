@@ -120,7 +120,7 @@ def prepare_train_val_loader(args):
                                         graph_sampler=args.graph_sampler, crossval=args.cross_val)
 
     #val_dataset_loader = DataListLoader(
-    print('num of workers', args.num_workers)
+    #print('num of workers', args.num_workers)
     #val_dataset_loader = DataLoader(
     val_dataset_loader = data_loader(
         validset,

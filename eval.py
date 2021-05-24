@@ -193,136 +193,136 @@ def eval_idx(total_iters, num_evals):
 #    print(intervals)
 #    return intervals
 
-def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=None, checkpoint = None):
-    print('train data loader type', type(dataset))
-    print('val data loader type', type(val_dataset))
-    print('model type', type(model))
-    print("==> Start training")
-    device = 'cuda:1' if torch.cuda.device_count()>1 else 'cuda:0'
-    start_epoch = 0
-    optimizer = init_optim(args.optim, model.parameters(), args.lr, args.weight_decay)
-    if checkpoint is not None:
-        optimizer.load_state_dict(checkpoint['optimizer'])
-        start_epoch = checkpoint['epoch']
-
-    if args.step_size > 0:
-        scheduler = lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
-    cudnn.benchmark = True
-    val_result={
-            'epoch': 0,
-            'loss': 0,
-            'img_acc': 0,
-            'patch_acc': 0 }
-    best_val_result = {
-            'epoch': 0,
-            'loss': 0,
-            'img_acc': 0,
-            'patch_acc': 0 }
-    test_result = {
-            'epoch': 0,
-            'loss': 0,
-            'img_acc': 0,
-            'patch_acc':0}
-    best_val_accs = []
-    best_val_epochs = []
-    test_accs = []
-    test_epochs = []
-    val_accs = []
-    save_path = os.path.join(args.resultdir, gen_prefix(args), TIME_NOW)
-    #num_eval = args.num_eval
-    #iter_num = len(dataset) // num_eval
-    #idxes = eval_idx(len(dataset), args.num_eval)
-    #print(idxes)
-
-    #import sys
-    #sys.exit()
-    #print(model)
-    #import sys
-    #sys.exit()
-    #print()
-    #tensor = torch.Tensor(1, 3, 16)
-
-    write_network = True
-
-    eval_idxes = eval_idx(len(dataset), args.num_eval)
-    print(eval_idxes)
-    if args.visualization:
-        eval_count = 0
-    for epoch in range(start_epoch, args.num_epochs):
-        epoch_start = time.time()
-        torch.cuda.empty_cache()
-        total_time = 0
-        avg_loss = 0.0
-        model.train()
-        dataset.dataset.set_epoch(epoch)
-
-
-        for batch_idx, data in enumerate(dataset):
-            if not args.load_data_list:
-                data.to(device)
-
-            _, cls_loss = model(data)
-            cls_loss = torch.mean(cls_loss)
-            loss = cls_loss
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            print('Training Loss:{:0.6f}, Epoch: {epoch}, Batch: [{batch_idx}/{total}] LR:{:0.6f}'.format(
-                loss.item(),
-                optimizer.param_groups[0]['lr'],
-                epoch=epoch,
-                batch_idx=batch_idx,
-                total=len(dataset) - 1
-            ))
-
-            if args.visualization:
-                n_iter = (epoch - 1) *  len(dataset) + batch_idx + 1
-                visualize_lastlayer(writer, model, n_iter)
-                visualize_scalar(writer, 'Train/loss', loss.item(), n_iter)
-
-
-
-            #print(eval_idxes)
-            if batch_idx in eval_idxes:
-                eval_start = time.time()
-                print('Evaluating at {}th iterations.......'.format(batch_idx))
-                #print(eval_idxes)
-                val_result = evaluate(val_dataset, model, args, name='Validation')
-                val_accs.append(val_result['patch_acc'])
-                if val_result['img_acc'] > best_val_result['img_acc'] - 1e-7:
-                    best_val_result['patch_acc'] = val_result['patch_acc']
-                    best_val_result['img_acc'] =  val_result['img_acc']
-                    best_val_result['epoch'] = epoch
-                    is_best = True
-                    print('Saveing best weight file to {}'.format(save_path))
-                    save_checkpoint({'epoch': epoch + 1,
-                                     'loss': avg_loss,
-                                     'state_dict': model.state_dict() if torch.cuda.device_count() < 2 else model.module.state_dict(),
-                                     'optimizer': optimizer.state_dict(),
-                                     'val_acc': val_result},
-                                    is_best, os.path.join(save_path, 'weight.pth.tar'.format(epoch + )))
-                model.train()
-                print('Epoch: {}, Eval time consumed: {:0.4f}s, Val patch acc: {:0.6f}, Val image acc: {:0.6f}, Best val acc: {:0.6f}'.format(
-                    epoch,
-                    time.time() - eval_start,
-                    val_result['patch_acc'],
-                    val_result['img_acc'],
-                    best_val_result['img_acc']
-                ))
-                if args.visualization:
-                    eval_count += 1
-                    visualize_scalar(writer, 'Val/patch_acc', val_result['patch_acc'],  eval_count)
-                    visualize_scalar(writer, 'Val/image_acc', val_result['img_acc'],  eval_count)
-
-        if args.step_size > 0:
-            scheduler.step()
-
-        print('training time consumed:{:2f}s'.format(
-            time.time() - epoch_start
-        ))
-
-    return model, val_accs
+#def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=None, checkpoint = None):
+#    print('train data loader type', type(dataset))
+#    print('val data loader type', type(val_dataset))
+#    print('model type', type(model))
+#    print("==> Start training")
+#    device = 'cuda:1' if torch.cuda.device_count()>1 else 'cuda:0'
+#    start_epoch = 0
+#    optimizer = init_optim(args.optim, model.parameters(), args.lr, args.weight_decay)
+#    if checkpoint is not None:
+#        optimizer.load_state_dict(checkpoint['optimizer'])
+#        start_epoch = checkpoint['epoch']
+#
+#    if args.step_size > 0:
+#        scheduler = lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
+#    cudnn.benchmark = True
+#    val_result={
+#            'epoch': 0,
+#            'loss': 0,
+#            'img_acc': 0,
+#            'patch_acc': 0 }
+#    best_val_result = {
+#            'epoch': 0,
+#            'loss': 0,
+#            'img_acc': 0,
+#            'patch_acc': 0 }
+#    test_result = {
+#            'epoch': 0,
+#            'loss': 0,
+#            'img_acc': 0,
+#            'patch_acc':0}
+#    best_val_accs = []
+#    best_val_epochs = []
+#    test_accs = []
+#    test_epochs = []
+#    val_accs = []
+#    save_path = os.path.join(args.resultdir, gen_prefix(args), TIME_NOW)
+#    #num_eval = args.num_eval
+#    #iter_num = len(dataset) // num_eval
+#    #idxes = eval_idx(len(dataset), args.num_eval)
+#    #print(idxes)
+#
+#    #import sys
+#    #sys.exit()
+#    #print(model)
+#    #import sys
+#    #sys.exit()
+#    #print()
+#    #tensor = torch.Tensor(1, 3, 16)
+#
+#    write_network = True
+#
+#    eval_idxes = eval_idx(len(dataset), args.num_eval)
+#    print(eval_idxes)
+#    if args.visualization:
+#        eval_count = 0
+#    for epoch in range(start_epoch, args.num_epochs):
+#        epoch_start = time.time()
+#        torch.cuda.empty_cache()
+#        total_time = 0
+#        avg_loss = 0.0
+#        model.train()
+#        dataset.dataset.set_epoch(epoch)
+#
+#
+#        for batch_idx, data in enumerate(dataset):
+#            if not args.load_data_list:
+#                data.to(device)
+#
+#            _, cls_loss = model(data)
+#            cls_loss = torch.mean(cls_loss)
+#            loss = cls_loss
+#            optimizer.zero_grad()
+#            loss.backward()
+#            optimizer.step()
+#
+#            print('Training Loss:{:0.6f}, Epoch: {epoch}, Batch: [{batch_idx}/{total}] LR:{:0.6f}'.format(
+#                loss.item(),
+#                optimizer.param_groups[0]['lr'],
+#                epoch=epoch,
+#                batch_idx=batch_idx,
+#                total=len(dataset) - 1
+#            ))
+#
+#            if args.visualization:
+#                n_iter = (epoch - 1) *  len(dataset) + batch_idx + 1
+#                visualize_lastlayer(writer, model, n_iter)
+#                visualize_scalar(writer, 'Train/loss', loss.item(), n_iter)
+#
+#
+#
+#            #print(eval_idxes)
+#            if batch_idx in eval_idxes:
+#                eval_start = time.time()
+#                print('Evaluating at {}th iterations.......'.format(batch_idx))
+#                #print(eval_idxes)
+#                val_result = evaluate(val_dataset, model, args, name='Validation')
+#                val_accs.append(val_result['patch_acc'])
+#                if val_result['img_acc'] > best_val_result['img_acc'] - 1e-7:
+#                    best_val_result['patch_acc'] = val_result['patch_acc']
+#                    best_val_result['img_acc'] =  val_result['img_acc']
+#                    best_val_result['epoch'] = epoch
+#                    is_best = True
+#                    print('Saveing best weight file to {}'.format(save_path))
+#                    save_checkpoint({'epoch': epoch + 1,
+#                                     'loss': avg_loss,
+#                                     'state_dict': model.state_dict() if torch.cuda.device_count() < 2 else model.module.state_dict(),
+#                                     'optimizer': optimizer.state_dict(),
+#                                     'val_acc': val_result['img_acc']},
+#                                    is_best, os.path.join(save_path, 'weight.pth.tar'))
+#                model.train()
+#                print('Epoch: {}, Eval time consumed: {:0.4f}s, Val patch acc: {:0.6f}, Val image acc: {:0.6f}, Best val acc: {:0.6f}'.format(
+#                    epoch,
+#                    time.time() - eval_start,
+#                    val_result['patch_acc'],
+#                    val_result['img_acc'],
+#                    best_val_result['img_acc']
+#                ))
+#                if args.visualization:
+#                    eval_count += 1
+#                    visualize_scalar(writer, 'Val/patch_acc', val_result['patch_acc'],  eval_count)
+#                    visualize_scalar(writer, 'Val/image_acc', val_result['img_acc'],  eval_count)
+#
+#        if args.step_size > 0:
+#            scheduler.step()
+#
+#        print('training time consumed:{:2f}s'.format(
+#            time.time() - epoch_start
+#        ))
+#
+#    return model, val_accs
 
 def cell_graph(args, writer = None):
     # val==test loader since we do cross-val
@@ -347,18 +347,19 @@ def cell_graph(args, writer = None):
                                           stage=args.stage
                                           )
 
+    model.load_state_dict(torch.load(args.weight_file)['state_dict'])
     #tensor = torch.Tensor(3, 10, 16)
-    if(args.resume):
-        if args.resume == 'best':
-            resume_file = 'model_best.pth.tar'
-            resume_path = os.path.join(args.resultdir, gen_prefix(args), resume_file)
-        elif args.resume == 'weight':
-            resume_file = 'weight.pth.tar'
-            resume_path = os.path.join(args.resultdir, gen_prefix(args), resume_file)
-        else:#'/media/amanda/HDD2T_1/warwick-research/experiment/gcnn/result'
-            resume_path  =  os.path.join(args.resultdir,args.resume,'model_best.pth.tar')
-        checkpoint = load_checkpoint(resume_path)
-        model.load_state_dict(checkpoint['state_dict'])
+    #if(args.resume):
+    #    if args.resume == 'best':
+    #        resume_file = 'model_best.pth.tar'
+    #        resume_path = os.path.join(args.resultdir, gen_prefix(args), resume_file)
+    #    elif args.resume == 'weight':
+    #        resume_file = 'weight.pth.tar'
+    #        resume_path = os.path.join(args.resultdir, gen_prefix(args), resume_file)
+    #    else:#'/media/amanda/HDD2T_1/warwick-research/experiment/gcnn/result'
+    #        resume_path  =  os.path.join(args.resultdir,args.resume,'model_best.pth.tar')
+    #    checkpoint = load_checkpoint(resume_path)
+    #    model.load_state_dict(checkpoint['state_dict'])
 
     if torch.cuda.device_count() > 1 :
         print('use %d GPUs for training!'% torch.cuda.device_count())
@@ -372,18 +373,21 @@ def cell_graph(args, writer = None):
             model = DataParallel(model).cuda()
         else:
             model = model.cuda()
+
+    val_result = evaluate(val_loader, model, args, name='Validation')
+    print(val_result)
+
     #print(type(model))
-    if not args.skip_train:
-        # 如果不跳过训练，就执行下面的操作
-        if args.resume:
-            _, val_accs = train(train_loader, model, args, val_dataset=val_loader, test_dataset=None,
-            writer=writer, checkpoint = checkpoint)
-        else:
-            _, val_accs = train(train_loader, model, args, val_dataset=val_loader, test_dataset=None,
-            writer=writer, )
-        print('finally: max_val_acc:%f'%max(val_accs))
+    #if not args.skip_train:
+    #    # 如果不跳过训练，就执行下面的操作
+    #    if args.resume:
+    #        _, val_accs = train(train_loader, model, args, val_dataset=val_loader, test_dataset=None,
+    #        writer=writer, checkpoint = checkpoint)
+    ##    else:
+    #        _, val_accs = train(train_loader, model, args, val_dataset=val_loader, test_dataset=None,
+    #        writer=writer, )
+    #    print('finally: max_val_acc:%f'%max(val_accs))
     #_ = evaluate(test_loader, model, args, name='Validation', max_num_examples=None)
-    print(_)
 
 def arg_parse():
     data_setting = DataSetting()
@@ -480,6 +484,7 @@ def arg_parse():
     parser.add_argument('--depth', default=None, type=int)
     parser.add_argument('--stage', nargs='*', type=int)
     parser.add_argument('--num_eval', default=1, type=int)
+    parser.add_argument('--weight_file', required=True, type=str)
 
     parser.set_defaults(datadir=data_setting.root,
                         logdir=data_setting.log_path,
