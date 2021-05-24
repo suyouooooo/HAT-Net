@@ -160,7 +160,7 @@ def gen_prefix(args):
     if args.jump_knowledge:
         name +='_jk'
     name += args.graph_sampler
-    if args.cross_val!=1:
+    if args.cross_val:
         name +='_cv'+str(args.cross_val)
     if args.stage:
         name += '_stage'
@@ -168,6 +168,8 @@ def gen_prefix(args):
             name += str(s)
     if args.depth:
         name += '_depth'
+        name += str(args.depth)
+    print('name', name)
 
     return name
 
@@ -301,7 +303,7 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                                      'state_dict': model.state_dict() if torch.cuda.device_count() < 2 else model.module.state_dict(),
                                      'optimizer': optimizer.state_dict(),
                                      'val_acc': val_result},
-                                    is_best, os.path.join(save_path, 'weight.pth.tar'.format(epoch + )))
+                                    is_best, os.path.join(save_path, 'weight.pth.tar'.format(epoch)))
                 model.train()
                 print('Epoch: {}, Eval time consumed: {:0.4f}s, Val patch acc: {:0.6f}, Val image acc: {:0.6f}, Best val acc: {:0.6f}'.format(
                     epoch,
@@ -310,6 +312,7 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                     val_result['img_acc'],
                     best_val_result['img_acc']
                 ))
+                print(val_result)
                 if args.visualization:
                     eval_count += 1
                     visualize_scalar(writer, 'Val/patch_acc', val_result['patch_acc'],  eval_count)
@@ -527,6 +530,7 @@ def main():
     writer = None
     if prog_args.visualization:
         tb_logdir = os.path.join(settings.log_dir, gen_prefix(prog_args), TIME_NOW)
+        print(tb_logdir)
         mkdirs([tb_logdir])
         writer = SummaryWriter(log_dir=tb_logdir)
     #if os.path.exists()
@@ -535,5 +539,6 @@ def main():
 
 if __name__ == "__main__":
     #torch.multiprocessing.set_sharing_strategy('file_system')
+
     print('shared strategy', torch.multiprocessing.get_sharing_strategy())
     main()

@@ -120,66 +120,68 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
     result = {'patch_acc': metrics.accuracy_score(labels_n_time,pred_n_times), 'img_acc':multi_class_acc, 'binary_acc': binary_acc }
     return result
 
-def gen_prefix(args):
-
-    name = args.dataset
-    name += '_' + args.method
-    if args.method == 'soft-assign':
-        name += '_l' + str(args.num_gc_layers) + 'x' + str(args.num_pool)
-        name += '_ar' + str(int(args.assign_ratio*100))
-
-    name += '_h' + str(args.hidden_dim) + '_o' + str(args.output_dim)
-    if not args.bias:
-        name += '_nobias'
-    if len(args.name_suffix) > 0:
-        name += '_' + args.name_suffix
-    name +=  '_f' +args.feature_type
-    name += '_%' + str(args.sample_ratio)
-    # name += '_' + args.sample_method
-    name +=args.name
-
-    if args.load_data_sparse:
-        name += '_sp'
-    if args.load_data_list:
-        name +='_list'
-    if args.norm_adj:
-        name+='_adj0.4'
-    if args.activation !='relu':
-        name+=args.activation
-    if args.readout =='mix':
-        name+=args.readout
-    if args.task != 'CRC':
-        name+=('_'+args.task)
-    if args.mask !='cia':
-        name +='hvnet'
-    if args.neighbour !=8:
-        name +='_n'+str(args.neighbour)
-    name += '_sr' + str(args.sample_ratio)
-    if args.drop_out >0:
-        name +='_d' + str(args.drop_out)
-    if args.jump_knowledge:
-        name +='_jk'
-    name += args.graph_sampler
-    if args.cross_val!=1:
-        name +='_cv'+str(args.cross_val)
-    if args.stage:
-        name += '_stage'
-        for s in args.stage:
-            name += str(s)
-    if args.depth:
-        name += '_depth'
-
-    return name
-
-def eval_idx(total_iters, num_evals):
-    interval = total_iters // num_evals
-    first_interval = total_iters - interval * num_evals + interval - 1
-    intervals = []
-    intervals.append(first_interval)
-    for i in range(num_evals - 1):
-        intervals.append(interval + intervals[-1])
-
-    return intervals
+#def gen_prefix(args):
+#
+#    name = args.dataset
+#    name += '_' + args.method
+#    if args.method == 'soft-assign':
+#        name += '_l' + str(args.num_gc_layers) + 'x' + str(args.num_pool)
+#        name += '_ar' + str(int(args.assign_ratio*100))
+#
+#    name += '_h' + str(args.hidden_dim) + '_o' + str(args.output_dim)
+#    if not args.bias:
+#        name += '_nobias'
+#    if len(args.name_suffix) > 0:
+#        name += '_' + args.name_suffix
+#    name +=  '_f' +args.feature_type
+#    name += '_%' + str(args.sample_ratio)
+#    # name += '_' + args.sample_method
+#    name +=args.name
+#
+#    if args.load_data_sparse:
+#        name += '_sp'
+#    if args.load_data_list:
+#        name +='_list'
+#    if args.norm_adj:
+#        name+='_adj0.4'
+#    if args.activation !='relu':
+#        name+=args.activation
+#    if args.readout =='mix':
+#        name+=args.readout
+#    if args.task != 'CRC':
+#        name+=('_'+args.task)
+#    if args.mask !='cia':
+#        name +='hvnet'
+#    if args.neighbour !=8:
+#        name +='_n'+str(args.neighbour)
+#    name += '_sr' + str(args.sample_ratio)
+#    if args.drop_out >0:
+#        name +='_d' + str(args.drop_out)
+#    if args.jump_knowledge:
+#        name +='_jk'
+#    name += args.graph_sampler
+#    if args.cross_val:
+#        name +='_cv'+str(args.cross_val)
+#    if args.stage:
+#        name += '_stage'
+#        for s in args.stage:
+#            name += str(s)
+#    if args.depth:
+#        name += '_depth'
+#        name += str(args.depth)
+#
+#    print('name', name)
+#    return name
+#
+#def eval_idx(total_iters, num_evals):
+#    interval = total_iters // num_evals
+#    first_interval = total_iters - interval * num_evals + interval - 1
+#    intervals = []
+#    intervals.append(first_interval)
+#    for i in range(num_evals - 1):
+#        intervals.append(interval + intervals[-1])
+#
+#    return intervals
 
 #def eval_idx(total_iters, num_evals):
 #    interval = total_iters // num_evals -
