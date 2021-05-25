@@ -230,18 +230,19 @@ def _get_lastlayer_params(net):
     """
     last_layer_weights = None
     last_layer_bias = None
+    layer_name = None
     for name, para in net.named_parameters():
         if 'weight' in name:
             last_layer_weights = para
         if 'bias' in name:
             last_layer_bias = para
-
-    return last_layer_weights, last_layer_bias
+        layer_name = name
+    return last_layer_weights, last_layer_bias, layer_name
 
 def visualize_lastlayer(writer, net, n_iter):
-    weights, bias = _get_lastlayer_params(net)
-    writer.add_scalar('LastLayerGradients/grad_norm2_weights', weights.grad.norm(), n_iter)
-    writer.add_scalar('LastLayerGradients/grad_norm2_bias', bias.grad.norm(), n_iter)
+    weights, bias, layer_name = _get_lastlayer_params(net)
+    writer.add_scalar('LastLayerGradients/grad_norm2_weights({})'.format(layer_name), weights.grad.norm(), n_iter)
+    writer.add_scalar('LastLayerGradients/grad_norm2_bias({})'.format(layer_name), bias.grad.norm(), n_iter)
 
 def visualize_scalar(writer, name, scalar, n_iter):
     """visualize scalar"""

@@ -169,6 +169,13 @@ def gen_prefix(args):
     if args.depth:
         name += '_depth'
         name += str(args.depth)
+    if args.num_epochs:
+        name += '_epochs'
+        name += str(args.num_epochs)
+    if args.lr:
+        name += '_lr':
+        name += str(args.lr)
+
     print('name', name)
 
     return name
@@ -279,9 +286,10 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
             ))
 
             if args.visualization:
-                n_iter = (epoch - 1) *  len(dataset) + batch_idx + 1
+                n_iter = epoch *  len(dataset) + batch_idx + 1
                 visualize_lastlayer(writer, model, n_iter)
                 visualize_scalar(writer, 'Train/loss', loss.item(), n_iter)
+                visualize_scalar(writer, 'Train/lr', optimizer.param_groups[0]['lr'], n_iter)
 
 
 
@@ -317,6 +325,7 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                     eval_count += 1
                     visualize_scalar(writer, 'Val/patch_acc', val_result['patch_acc'],  eval_count)
                     visualize_scalar(writer, 'Val/image_acc', val_result['img_acc'],  eval_count)
+                    visualize_scalar(writer, 'Val/binary_acc', val_result['binary_acc'],  eval_count)
 
         if args.step_size > 0:
             scheduler.step()
@@ -350,6 +359,7 @@ def cell_graph(args, writer = None):
                                           stage=args.stage
                                           )
 
+    print(model)
     #tensor = torch.Tensor(3, 10, 16)
     if(args.resume):
         if args.resume == 'best':

@@ -215,17 +215,20 @@ class SoftPoolingGcnEncoder(nn.Module):
             nn.ReLU(),
             nn.Linear(pred_input // 2, label_dim))
 
-        self.pos_emb = nn.Parameter(torch.randn(1, 114, 20))
+        #self.pos_emb = nn.Parameter(torch.randn(1, 114, 20))
 
 
         if stage is None:
             stage = []
 
         if  len(stage) == 2:
+            self.pos_emb = nn.Parameter(torch.randn(1, 114, 20))
             self.trans_encoder2 = Transformer(20, depth, 2, 10, 20, 0.1)
             self.trans_encoder3 = Transformer(20, depth, 2, 10, 20, 0.1)
         elif  len(stage) == 1:
+            self.pos_emb = nn.Parameter(torch.randn(1, 114, 20))
             self.trans_encoder = Transformer(20, depth, 2, 10, 20, 0.1)
+
         self.stage = stage
 
     @staticmethod
