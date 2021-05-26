@@ -13,7 +13,7 @@ import json
 import time
 from common.utils import mkdirs, save_checkpoint, load_checkpoint, init_optim, output_to_gexf
 from torch.optim import lr_scheduler
-from model import network_GIN_Hierarchical
+from model import network_GIN_Hierarchical, network_CGCNet
 from torch_geometric.nn import DataParallel
 from dataflow.data import prepare_train_val_loader
 from setting import CrossValidSetting as DataSetting
@@ -347,19 +347,31 @@ def cell_graph(args, writer = None):
     if args.task == 'CRC':
         args.num_classes = 3
     # model = atten_network.SpGAT(18,args.hidden_dim,3, args.drop_out, args.assign_ratio,3)
-    model = network_GIN_Hierarchical.SoftPoolingGcnEncoder(setting.max_num_nodes,
-        input_dim, args.hidden_dim, args.output_dim, True, True, args.hidden_dim,  args.num_classes,
-                                          args.assign_ratio,[50], concat= True,
-                                          gcn_name= args.gcn_name,collect_assign=args.visualization,
-                                          #load_data_sparse=(args.load_data_list and not args.visualization),
-                                          #load_data_sparse=args.load_data_sparse,
-                                          #load_data_sparse=(not args.load_data_list),
-                                          load_data_sparse=True,
-                                          norm_adj=args.norm_adj, activation=args.activation, drop_out=args.drop_out,
-                                          jk=args.jump_knowledge,
-                                          depth=args.depth,
-                                          stage=args.stage
-                                          )
+    if args.network == 'HGTIN':
+        model = network_GIN_Hierarchical.SoftPoolingGcnEncoder(setting.max_num_nodes,
+            input_dim, args.hidden_dim, args.output_dim, True, True, args.hidden_dim,  args.num_classes,
+                                              args.assign_ratio,[50], concat= True,
+                                              gcn_name= args.gcn_name,collect_assign=args.visualization,
+                                              #load_data_sparse=(args.load_data_list and not args.visualization),
+                                              #load_data_sparse=args.load_data_sparse,
+                                              #load_data_sparse=(not args.load_data_list),
+                                              load_data_sparse=True,
+                                              norm_adj=args.norm_adj, activation=args.activation, drop_out=args.drop_out,
+                                              jk=args.jump_knowledge,
+                                              depth=args.depth,
+                                              stage=args.stage
+                                              )
+    elif args.network == 'CGC':
+        model = network_CGCNet.SoftPoolingGcnEncoder(setting.max_num_nodes,
+                                              input_dim, args.hidden_dim, args.output_dim, True, True, args.hidden_dim,
+                                              args.num_classes,
+                                              args.assign_ratio, [50], concat=True,
+                                              gcn_name=args.gcn_name, collect_assign=args.visualization,
+                                              load_data_sparse=True,
+                                              norm_adj=args.norm_adj, activation=args.activation,
+                                              drop_out=args.drop_out,
+                                              jk=args.jump_knowledge,
+                                              )
 
     print(model)
     #tensor = torch.Tensor(3, 10, 16)
@@ -495,6 +507,8 @@ def arg_parse():
     parser.add_argument('--depth', default=None, type=int)
     parser.add_argument('--stage', nargs='*', type=int)
     parser.add_argument('--num_eval', default=1, type=int)
+
+    parser.add_argument('--network', default='HGTIN', type=str)
 
     parser.set_defaults(datadir=data_setting.root,
                         logdir=data_setting.log_path,
