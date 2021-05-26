@@ -5,17 +5,17 @@
 
 single gpu
 ``
-python -u train_GIN_Hierarchical.py --norm_adj --batch-size=20 --step_size=10 --jk  --cv 2  --num_eval 5
+python -u train_GIN_Hierarchical.py  --norm_adj --batch-size=20 --step_size=15 --jk  --cv 3  --num_eval 5 --visualization --lr 0.0003 --epochs 20   --gamma 0.33 --stage 2 3 --depth 1
 ``
 multi gpu
 
 tested:
 ``
-python -u train_GIN_Hierarchical.py --norm_adj --batch-size=20 --step_size=10 --jk  --cv 2  --num_eval 5 --load_data_list
+python -u train_GIN_Hierarchical.py  --norm_adj --batch-size=20 --step_size=15 --jk  --cv 3  --num_eval 5 --visualization --lr 0.0003 --epochs 20   --gamma 0.33 --stage 2 3 --depth 1 --load_data_list
 ``
 or(has not been tested):
 ``
-python -u train_GIN_Hierarchical.py --norm_adj --batch-size=20 --step_size=10 --jk  --cv 2  --num_eval 5
+python -u train_GIN_Hierarchical.py  --norm_adj --batch-size=20 --step_size=15 --jk  --cv 3  --num_eval 5 --visualization --lr 0.0003 --epochs 20   --gamma 0.33 --stage 2 3 --depth 1
 ``
 
 eval:
@@ -25,5 +25,5 @@ python -u eval.py  --norm_adj --batch-size=10 --step_size=10 --jk  --depth 1  --
 
 visulization:
 ```
-python -u train_GIN_Hierarchical.py --norm_adj --batch-size=20 --step_size=10 --jk  --cv 2  --num_eval 5 --visualization
+python -u train_GIN_Hierarchical.py  --norm_adj --batch-size=20 --step_size=15 --jk  --cv 3  --num_eval 5 --visualization --lr 0.0003 --epochs 20   --gamma 0.33 --stage 2 3 --depth 1
 ```
