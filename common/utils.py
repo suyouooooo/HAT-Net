@@ -234,9 +234,11 @@ def _get_lastlayer_params(net):
     for name, para in net.named_parameters():
         if 'weight' in name:
             last_layer_weights = para
+            layer_name = name.replace('.weight', '')
         if 'bias' in name:
             last_layer_bias = para
-        layer_name = name
+            layer_name = name.replace('.bias', '')
+
     return last_layer_weights, last_layer_bias, layer_name
 
 def visualize_lastlayer(writer, net, n_iter):
