@@ -208,12 +208,6 @@ class SoftPoolingGcnEncoder(nn.Module):
         self.pred_model = self.build_readout_module(pred_input, pred_hidden_dims,
                                                     label_dim, activation)
 
-        self.mlp = nn.Sequential(
-            nn.Linear(pred_input , pred_input), # pred_input 60
-            nn.ReLU(),
-            nn.Linear(pred_input, pred_input // 2),
-            nn.ReLU(),
-            nn.Linear(pred_input // 2, label_dim))
 
         #self.pos_emb = nn.Parameter(torch.randn(1, 114, 20))
 
@@ -230,6 +224,13 @@ class SoftPoolingGcnEncoder(nn.Module):
             self.trans_encoder = Transformer(20, depth, 2, 10, 20, 0.1)
 
         self.stage = stage
+
+        self.mlp = nn.Sequential(
+            nn.Linear(pred_input , pred_input), # pred_input 60
+            nn.ReLU(),
+            nn.Linear(pred_input, pred_input // 2),
+            nn.ReLU(),
+            nn.Linear(pred_input // 2, label_dim))
 
     @staticmethod
     def construct_mask( max_nodes, batch_num_nodes):

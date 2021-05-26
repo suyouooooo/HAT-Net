@@ -173,9 +173,11 @@ def gen_prefix(args):
         name += '_epochs'
         name += str(args.num_epochs)
     if args.lr:
-        name += '_lr':
+        name += '_lr'
         name += str(args.lr)
-
+    if args.gamma:
+        name += '_gamma'
+        name += str(args.gamma)
     print('name', name)
 
     return name
