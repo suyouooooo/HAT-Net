@@ -175,6 +175,9 @@ def gen_prefix(args):
     if args.lr:
         name += '_lr'
         name += str(args.lr)
+    if args.network:
+        name += '_network':
+        name += str(args.network)
     if args.gamma:
         name += '_gamma'
         name += str(args.gamma)
