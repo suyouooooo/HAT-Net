@@ -3,7 +3,8 @@ import os.path as osp
 import os
 
 import sys
-sys.path.append(os.path.join('/data/smb/syh/PycharmProjects/CGC-Net'))
+import os
+sys.path.append(os.getcwd())
 import torch
 from multiprocessing import Pool
 from torch_geometric.data import Data
@@ -89,6 +90,7 @@ def gen(raw_path):
      # Read data from `raw_path`
      ## raw_path is /data/hdd1/syh/PycharmProjects/CGC-Net/data/raw/CRC/fold_1/1_normal/xx.png
      # raw_path is /data/hdd1/syh/PycharmProjects/CGC-Net/data/proto/feature/CRC/fold_1/1_normal/xx(无后缀)
+    #print(raw_path)
     data =_read_one_raw_graph(raw_path)
      # sample epoch time
     num_nodes = data.x.shape[0]
@@ -109,6 +111,9 @@ def gen(raw_path):
            edge_index = random_sample_graph2(choice, distance, 100, True,
                                      n_sample=8,sparse=True)
        subdata.edge_index=edge_index
+       print(osp.join(processed_dir,str(i),
+                                 raw_path.split('/')[-3],
+                                    raw_path.split('/')[-1].split('.')[0] + '.pt'))
        torch.save(subdata, osp.join(processed_dir,str(i),
                                  raw_path.split('/')[-3],
                                     raw_path.split('/')[-1].split('.')[0] + '.pt'))
@@ -141,6 +146,8 @@ if __name__ == '__main__':
     graph_sampler = 'knn'
     epoch = 30
     sampler = FarthestSampler()
+    print(setting.root)
+
     for fold in folds:
         for f in glob.iglob(setting.root + '/proto/feature/CRC/' + fold + '/**/*', recursive=True):
             if '.npy' in f:
