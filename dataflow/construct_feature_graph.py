@@ -128,16 +128,17 @@ def _get_batch_features_new(numpy_queue, info_queue):
                 nuc_feats.append(solidity)
                 nuc_feats.append(orientation)
                 feature = np.hstack(nuc_feats)
-                node_feature.append(feature)
-                node_coordinate.append(coor)
+                node_feature.append(feature) # feature : (16:)
+                node_coordinate.append(coor) # coor: tuple len 2
 
             if len(node_feature) == 0:
                 pass
             else:
                 node_feature = np.vstack(node_feature)
                 node_coordinate = np.vstack(node_coordinate)
-                print(node_feature.shape)
-                print(node_coordinate.shape)
+
+                #print(node_feature.shape) # (3093, 16)
+                #print(node_coordinate.shape) # (3093, 2)
 
                 # 把特征表示和质心表示都存储起来
                 #np.save(os.path.join(self.feature_save_path, name), node_feature.astype(np.float32))
@@ -160,9 +161,9 @@ if __name__ == '__main__':
         nameQueue.put(i)
     nameQueue.put('end')
     Process_C = []
-    for i in range(32):
+    for i in range(2):
         Process_C.append(multiprocessing.Process(target=_get_batch_features_new, args=(nameQueue, infoQueue)))
-    for i in range(32):
+    for i in range(2):
         Process_C[i].start()
 
     total = len(setting.numpy_list)
