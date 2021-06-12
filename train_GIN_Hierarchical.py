@@ -362,7 +362,9 @@ def cell_graph(args, writer = None):
                                               norm_adj=args.norm_adj, activation=args.activation, drop_out=args.drop_out,
                                               jk=args.jump_knowledge,
                                               depth=args.depth,
-                                              stage=args.stage
+                                              stage=args.stage,
+                                              jk_tec=args.jk_tec,
+                                              pool_tec=args.pool_tec
                                               )
     elif args.network == 'CGC':
         model = network_CGCNet.SoftPoolingGcnEncoder(setting.max_num_nodes,
@@ -373,7 +375,7 @@ def cell_graph(args, writer = None):
                                               load_data_sparse=True,
                                               norm_adj=args.norm_adj, activation=args.activation,
                                               drop_out=args.drop_out,
-                                              jk=args.jump_knowledge,
+                                              jk=args.jump_knowledge
                                               )
 
     print(model)
@@ -512,6 +514,8 @@ def arg_parse():
     parser.add_argument('--num_eval', default=1, type=int)
 
     parser.add_argument('--network', default='HGTIN', type=str)
+    parser.add_argument('--jk_tec', default='lstm', type=str)
+    parser.add_argument('--pool_tec', default='mincut', type=str)
 
     parser.set_defaults(datadir=data_setting.root,
                         logdir=data_setting.log_path,

@@ -143,7 +143,7 @@ class SoftPoolingGcnEncoder(nn.Module):
     def __init__(self, max_num_nodes, input_dim, hidden_dim, embedding_dim, bias, bn, assign_hidden_dim,label_dim,
                  assign_ratio=0.25,  pred_hidden_dims=[50], concat = True, gcn_name='SAGE',
                  collect_assign = False, load_data_sparse = False,norm_adj=False,
-                 activation = 'relu',  drop_out = 0.,jk = False, depth=None, stage=None):
+                 activation = 'relu',  drop_out = 0.,jk = False, depth=None, stage=None, jk_tec='lstm', pool_tec='mincut'):
 
 
         super(SoftPoolingGcnEncoder, self).__init__()
@@ -154,6 +154,7 @@ class SoftPoolingGcnEncoder(nn.Module):
         self.load_data_sparse = load_data_sparse
         self.collect_assign = collect_assign
         self.assign_matrix = []
+        self.pool_tec = pool_tec
         assign_dim = int(max_num_nodes * assign_ratio)
         # self.GCN_embed_1 = GNN_Module(input_dim, hidden_dim, embedding_dim, bias, bn,
         #                               add_loop= False, lin=False, gcn_name=gcn_name,activation=activation, jk = jk)
@@ -161,7 +162,7 @@ class SoftPoolingGcnEncoder(nn.Module):
                             nn.Linear(embedding_dim, embedding_dim))
         self.GCN_embed_1 = DenseGINConv(nn1)
         if jk:
-            self.jk1 = DenseJK('lstm', hidden_dim, 3)
+            self.jk1 = DenseJK(jk_tec, hidden_dim, 3)
 
         # self.GCN_pool_1 = GNN_Module(input_dim, assign_hidden_dim, assign_dim, bias, bn,
         #                              add_loop= False, gcn_name=gcn_name,activation=activation, jk = jk)
@@ -182,7 +183,7 @@ class SoftPoolingGcnEncoder(nn.Module):
                             nn.Linear(embedding_dim, embedding_dim))
         self.GCN_embed_2 = DenseGINConv(nn3)
         if jk:
-            self.jk2 = DenseJK('lstm', hidden_dim, 3)
+            self.jk2 = DenseJK(jk_tec, hidden_dim, 3)
         # self.GCN_pool_2 = GNN_Module(input_dim, assign_hidden_dim, assign_dim, bias, bn,
         #                              add_loop= False, gcn_name=gcn_name,activation=activation, jk = jk)
 
@@ -197,7 +198,7 @@ class SoftPoolingGcnEncoder(nn.Module):
                             nn.Linear(embedding_dim, embedding_dim))
         self.GCN_embed_3 = DenseGINConv(nn5)
         if jk:
-            self.jk3 = DenseJK('lstm', hidden_dim, 3)
+            self.jk3 = DenseJK(jk_tec, hidden_dim, 3)
 
         nn6 = nn.Sequential(nn.Linear(input_dim, assign_dim), self._activation(activation),
                             nn.Linear(assign_dim, assign_dim))
@@ -380,9 +381,12 @@ class SoftPoolingGcnEncoder(nn.Module):
         # out, _ = torch.max(embed_feature, dim = 1)
         # out_all.append(out)
         assign = self.GCN_pool_1(x, adj, embedding_mask)
-        x, adj,mincut_loss, ortho_loss, num_nodes = self.dense_mincut_pool(embed_feature, adj, assign, embedding_mask)
-        # print("stage 1: " + str(x.size()))
-        # print("stage 1 adj: " + str(adj.size()))
+
+        if self.pool_tec == 'mincut':
+            x, adj,mincut_loss, ortho_loss, num_nodes = self.dense_mincut_pool(embed_feature, adj, assign, embedding_mask)
+        elif self.pool_tec == 'diff':
+            x, adj = self._diff_pool(embed_feature, adj, assign, embedding_mask)
+
         out, _ = torch.max(x, dim=1)
         out_all.append(out)
 
@@ -404,7 +408,10 @@ class SoftPoolingGcnEncoder(nn.Module):
         # out_all.append(out)
         assign = self.GCN_pool_2(x, adj, None)
 
-        x, adj,mincut_loss, ortho_loss, num_nodes = self.dense_mincut_pool(embed_feature, adj, assign, None)
+        if self.pool_tec == 'mincut':
+            x, adj,mincut_loss, ortho_loss, num_nodes = self.dense_mincut_pool(embed_feature, adj, assign, None)
+        elif self.pool_tec == 'diff':
+            x, adj = self._diff_pool(embed_feature, adj, assign, None)
 
         #if self.stage is not None and 2 in self.stage:
         if len(self.stage) == 2:
@@ -437,7 +444,11 @@ class SoftPoolingGcnEncoder(nn.Module):
         # out, _ = torch.max(embed_feature, dim=1)
         # out_all.append(out)
         assign = self.GCN_pool_3(x, adj, None)
-        x, adj, mincut_loss, ortho_loss, num_nodes = self.dense_mincut_pool(embed_feature, adj, assign, None)
+
+        if self.pool_tec == 'mincut':
+            x, adj,mincut_loss, ortho_loss, num_nodes = self.dense_mincut_pool(embed_feature, adj, assign, None)
+        elif self.pool_tec == 'diff':
+            x, adj = self._diff_pool(embed_feature, adj, assign, None)
 
         if len(self.stage) == 2:
             #x += self.pos_emb
