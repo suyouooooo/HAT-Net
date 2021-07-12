@@ -10,6 +10,6 @@ source /home/syh/anaconda3/bin/activate
 which python
 #conda activate CGC-Net2
 conda activate CGC-Net2-tensorboard
-cd /data/by/tmp/HGIN
+#cd /data/by/tmp/HGIN
 
 python -u /data/by/tmp/HGIN/compute_mean.py

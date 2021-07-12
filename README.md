@@ -5,7 +5,7 @@
 
 single gpu
 ``
-python -u train_GIN_Hierarchical.py  --norm_adj --batch-size=20 --step_size=15 --jk  --cv 3  --num_eval 5 --visualization --lr 0.0003 --epochs 20   --gamma 0.33 --stage 2 3 --depth 1
+python -u train_GIN_Hierarchical.py  --norm_adj --batch-size=20 --step_size=15 --jk  --cv 3  --num_eval 5 --visualization --epochs 20   --stage 2 3 --depth 6
 ``
 multi gpu
 

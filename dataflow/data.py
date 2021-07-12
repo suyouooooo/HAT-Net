@@ -11,6 +11,7 @@ from common.utils import FarthestSampler,filter_sampled_indice
 from torch_geometric.utils import sparse_to_dense, dense_to_sparse
 # from torch_geometric.utils import to_dense_adj, dense_to_sparse
 from setting import CrossValidSetting
+from .mean_std import MEAN_STD
 
 
 _CROSS_VAL = {1:{'train':['fold_1', 'fold_2'], 'valid': ['fold_3']},
@@ -19,6 +20,7 @@ _CROSS_VAL = {1:{'train':['fold_1', 'fold_2'], 'valid': ['fold_3']},
 
 }
 
+_MEAN_CIA, _STD_CIA = MEAN_STD['res50_fuse_cia']
 ##############hand craf
 #_MEAN_CIA = {1:[ 1.44855589e+02,  1.50849152e+01,  4.16993829e+02, -9.89115031e-02,
 #         4.29073361e+00,  7.03308534e+00,  1.50311764e-01,  1.20372119e-01,
@@ -88,27 +90,44 @@ _CROSS_VAL = {1:{'train':['fold_1', 'fold_2'], 'valid': ['fold_3']},
 
 
 
+#mean = tensor([1.0004e-01, 1.0469e-01, 9.8856e-02, 1.0034e-01, 1.0455e-01, 9.9568e-02,
+#        1.0086e-01, 1.0116e-01, 1.0169e-01, 1.0345e-01, 9.9807e-02, 1.0143e-01,
+#        9.8571e-02, 9.8970e-02, 9.9795e-02, 9.1498e-02, 1.7918e+03, 1.7915e+03]) tensor([1.0007e-01, 1.0476e-01, 9.8899e-02, 1.0045e-01, 1.0465e-01, 9.9645e-02,
+#        1.0091e-01, 1.0126e-01, 1.0175e-01, 1.0345e-01, 9.9880e-02, 1.0155e-01,
+#        9.8692e-02, 9.9076e-02, 9.9837e-02, 9.1599e-02, 1.7832e+03, 1.7875e+03]) tensor([9.9898e-02, 1.0479e-01, 9.8879e-02, 1.0035e-01, 1.0460e-01, 9.9643e-02,
+#        1.0081e-01, 1.0125e-01, 1.0169e-01, 1.0344e-01, 9.9899e-02, 1.0154e-01,
+#        9.8558e-02, 9.9080e-02, 9.9766e-02, 9.1554e-02, 1.7958e+03, 1.7843e+03])
+#std
+#{0: tensor([2.1641e-02, 1.7274e-02, 1.8414e-02, 1.8619e-02, 2.0691e-02, 1.7901e-02,
+#        2.0198e-02, 1.8318e-02, 1.8154e-02, 1.8495e-02, 1.8015e-02, 1.7429e-02,
+#        1.9066e-02, 1.9761e-02, 1.9789e-02, 1.6662e-02, 1.0285e+03, 1.0299e+03]), 1: tensor([2.1520e-02, 1.7472e-02, 1.8573e-02, 1.8690e-02, 2.0908e-02, 1.8177e-02,
+#        2.0029e-02, 1.8531e-02, 1.8260e-02, 1.8736e-02, 1.8241e-02, 1.7600e-02,
+#        1.9161e-02, 1.9847e-02, 1.9907e-02, 1.6849e-02, 1.0300e+03, 1.0299e+03]), 2: tensor([2.1462e-02, 1.7523e-02, 1.8728e-02, 1.8574e-02, 2.0942e-02, 1.8214e-02,
+#        2.0301e-02, 1.8576e-02, 1.8271e-02, 1.8652e-02, 1.8373e-02, 1.7589e-02,
+#        1.9204e-02, 2.0037e-02, 1.9948e-02, 1.7002e-02, 1.0316e+03, 1.0307e+03])}
 
 
 
-_MEAN_CIA = {1: [1.0043e-01, 1.0462e-01, 9.8516e-02, 9.9867e-02, 1.0350e-01, 9.8887e-02,
-                1.0095e-01, 1.0098e-01, 1.0170e-01, 1.0308e-01, 9.9446e-02, 1.0116e-01,
-                9.8173e-02, 9.9048e-02, 9.9398e-02, 9.1245e-02, 1.7878e+03, 1.7900e+03],
-            2:[1.0052e-01, 1.0471e-01, 9.8560e-02, 9.9972e-02, 1.0361e-01, 9.8964e-02,
-               1.0101e-01, 1.0108e-01, 1.0177e-01, 1.0312e-01, 9.9522e-02, 1.0128e-01,
-               9.8276e-02, 9.9148e-02, 9.9431e-02, 9.1336e-02, 1.7720e+03, 1.7873e+03],
-            3: [1.0032e-01, 1.0463e-01, 9.8457e-02, 9.9876e-02, 1.0353e-01, 9.8912e-02,
-                1.0087e-01, 1.0098e-01, 1.0164e-01, 1.0304e-01, 9.9461e-02, 1.0119e-01,
-                9.8136e-02, 9.9053e-02, 9.9328e-02, 9.1214e-02, 1.7929e+03, 1.7827e+03]}
-_STD_CIA = {1:[2.5052e-02, 2.0846e-02, 2.2134e-02, 2.2182e-02, 2.4054e-02, 2.1292e-02,
-                2.4095e-02, 2.2014e-02, 2.1814e-02, 2.2437e-02, 2.1434e-02, 2.0996e-02,
-                2.2868e-02, 2.3616e-02, 2.3745e-02, 2.0011e-02, 1.0304e+03, 1.0324e+03],
-            2:[2.4986e-02, 2.1129e-02, 2.2346e-02, 2.2317e-02, 2.4346e-02, 2.1653e-02,
-                2.3998e-02, 2.2271e-02, 2.1991e-02, 2.2760e-02, 2.1709e-02, 2.1237e-02,
-                2.3036e-02, 2.3751e-02, 2.3892e-02, 2.0258e-02, 1.0327e+03, 1.0324e+03],
-            3:[2.4783e-02, 2.0973e-02, 2.2304e-02, 2.2053e-02, 2.4191e-02, 2.1477e-02,
-                2.4071e-02, 2.2154e-02, 2.1846e-02, 2.2499e-02, 2.1645e-02, 2.1047e-02,
-                2.2892e-02, 2.3742e-02, 2.3778e-02, 2.0216e-02, 1.0348e+03, 1.0332e+03]}
+# res50 fuse cia
+#_MEAN_CIA = {1: [1.0043e-01, 1.0462e-01, 9.8516e-02, 9.9867e-02, 1.0350e-01, 9.8887e-02,
+#                1.0095e-01, 1.0098e-01, 1.0170e-01, 1.0308e-01, 9.9446e-02, 1.0116e-01,
+#                9.8173e-02, 9.9048e-02, 9.9398e-02, 9.1245e-02, 1.7878e+03, 1.7900e+03],
+#            2:[1.0052e-01, 1.0471e-01, 9.8560e-02, 9.9972e-02, 1.0361e-01, 9.8964e-02,
+#               1.0101e-01, 1.0108e-01, 1.0177e-01, 1.0312e-01, 9.9522e-02, 1.0128e-01,
+#               9.8276e-02, 9.9148e-02, 9.9431e-02, 9.1336e-02, 1.7720e+03, 1.7873e+03],
+#            3: [1.0032e-01, 1.0463e-01, 9.8457e-02, 9.9876e-02, 1.0353e-01, 9.8912e-02,
+#                1.0087e-01, 1.0098e-01, 1.0164e-01, 1.0304e-01, 9.9461e-02, 1.0119e-01,
+#                9.8136e-02, 9.9053e-02, 9.9328e-02, 9.1214e-02, 1.7929e+03, 1.7827e+03]}
+# res50 fuse cia
+#_STD_CIA = {1:[2.5052e-02, 2.0846e-02, 2.2134e-02, 2.2182e-02, 2.4054e-02, 2.1292e-02,
+#                2.4095e-02, 2.2014e-02, 2.1814e-02, 2.2437e-02, 2.1434e-02, 2.0996e-02,
+#                2.2868e-02, 2.3616e-02, 2.3745e-02, 2.0011e-02, 1.0304e+03, 1.0324e+03],
+#            2:[2.4986e-02, 2.1129e-02, 2.2346e-02, 2.2317e-02, 2.4346e-02, 2.1653e-02,
+#                2.3998e-02, 2.2271e-02, 2.1991e-02, 2.2760e-02, 2.1709e-02, 2.1237e-02,
+#                2.3036e-02, 2.3751e-02, 2.3892e-02, 2.0258e-02, 1.0327e+03, 1.0324e+03],
+#            3:[2.4783e-02, 2.0973e-02, 2.2304e-02, 2.2053e-02, 2.4191e-02, 2.1477e-02,
+#                2.4071e-02, 2.2154e-02, 2.1846e-02, 2.2499e-02, 2.1645e-02, 2.1047e-02,
+#                2.2892e-02, 2.3742e-02, 2.3778e-02, 2.0216e-02, 1.0348e+03, 1.0332e+03]}
 
 def prepare_train_val_loader(args):
 
@@ -130,11 +149,13 @@ def prepare_train_val_loader(args):
         datasetting=setting,
         neighbour=args.neighbour,
         graph_sampler=args.graph_sampler,
+        name=args.name,
+        mask=args.mask,
         crossval=args.cross_val),
         sampler=sampler_type,
         batch_size=args.batch_size,
         shuffle=True if sampler_type is None else False,
-        num_workers=args.num_workers
+        num_workers=args.num_workers,
     )
 
     validset = NucleiDatasetBatchOutput(root=setting.root,
@@ -147,7 +168,9 @@ def prepare_train_val_loader(args):
                                         sampling_method=args.sampling_method,
                                         datasetting=setting,
                                         neighbour=args.neighbour,
-                                        graph_sampler=args.graph_sampler, crossval=args.cross_val)
+                                        graph_sampler=args.graph_sampler, crossval=args.cross_val,
+                                        name=args.name,
+                                        mask=args.mask)
 
     #val_dataset_loader = DataListLoader(
     #print('num of workers', args.num_workers)
@@ -171,7 +194,9 @@ def prepare_train_val_loader(args):
                                     datasetting=setting,
                                     neighbour=args.neighbour,
                                     graph_sampler=args.graph_sampler,
-                                    crossval=args.cross_val)
+                                    crossval=args.cross_val,
+                                    name=args.name,
+                                    mask=args.mask)
 
         test_dataset_loader = torch.utils.data.DataLoader(
             testset,
@@ -191,7 +216,7 @@ class NucleiDataset(Dataset):
 
     def __init__(self, root,  feature_type, transform=None, pre_transform=None, split = 'train',
                  sampling_time = 10, sampling_ratio = 0.5, normalize = False, dynamic_graph = False, sampling_method = 'farthest',
-                datasetting = None,neighbour = 8, graph_sampler = 'knn',crossval = 1):
+                datasetting = None,neighbour = 8, graph_sampler = 'knn',crossval = 1, name='fuse', mask='cia'):
         super(NucleiDataset, self).__init__( root, transform, pre_transform)
         setting = datasetting#DataSetting()
         self.epoch = 0
@@ -218,13 +243,13 @@ class NucleiDataset(Dataset):
         else:
             np.random.seed(None)
         # _process_name = 'cross_val'
-        _process_name = 'fix_fuse_cia_knn/2'
+        _process_name = 'fix_{}_{}_knn/0'.format(name, mask)
         self.processed_dir = []
         for fold in _CROSS_VAL[self.cross_val][split]:
             # print("cross path is   " + str(osp.join(self.root, 'proto', _process_name, fold)))
             self.processed_dir.append(osp.join(self.root, 'proto', _process_name, fold))
         self.processed_root = os.path.join(self.root, 'proto', _process_name)
-        self.processed_fix_data_root =  os.path.join(self.root, 'proto', 'fix_fuse_cia_knn')
+        self.processed_fix_data_root =  os.path.join(self.root, 'proto', 'fix_{}_{}_knn'.format(name, mask))
         self.original_files = []
         self.original_files = [ f.split('.npy')[0] for f in self.original_files ]
         self.mean =  _MEAN_CIA[crossval]
@@ -373,13 +398,14 @@ class NucleiDatasetTest(NucleiDataset):
     def __init__(self, root, feature_type, transform=None, pre_transform=None, split = 'train',
                  normalize=False,
                  sampling_method='farthest', datasetting = None,
-                 neighbour = 8, graph_sampler = 'knn',crossval = 1):
+                 neighbour = 8, graph_sampler = 'knn',crossval = 1, name='fuse', mask='cia'):
         super(NucleiDatasetTest, self).__init__(root, feature_type, transform=transform,
                                                        pre_transform=pre_transform, split = split,
                                                        sampling_time=1, sampling_ratio=1,
                                                        normalize=normalize, dynamic_graph=False,
                                                        sampling_method=sampling_method,
-                                                       datasetting = datasetting,neighbour=neighbour,graph_sampler =graph_sampler,crossval=crossval )
+                                                       datasetting = datasetting,neighbour=neighbour,graph_sampler =graph_sampler,crossval=crossval,
+                                                       name=name, mask=mask)
     def get(self, idx):
         # only support batch size = 1
         data = torch.load(osp.join(self.processed_root, self.idxlist[idx]))
@@ -413,18 +439,20 @@ class NucleiDatasetTest(NucleiDataset):
 class NucleiDatasetBatchOutput(NucleiDataset):
     def __init__(self, root, feature_type, transform=None, pre_transform=None, split = 'train',
                  sampling_time=10, sampling_ratio=0.5, normalize=False, dynamic_graph = False, sampling_method = 'farthest',
-                 datasetting = None,neighbour = 8,graph_sampler ='knn',crossval = 1):
+                 datasetting = None,neighbour = 8,graph_sampler ='knn',crossval = 1, name='fuse', mask='cia'):
         super(NucleiDatasetBatchOutput, self).__init__( root, feature_type, transform=transform, pre_transform=pre_transform, split = split,
                  sampling_time=sampling_time, sampling_ratio=sampling_ratio, normalize=normalize, dynamic_graph=dynamic_graph, sampling_method  = sampling_method
                                                         ,datasetting=datasetting,neighbour=neighbour,
-                                                        graph_sampler =graph_sampler,crossval = crossval )
+                                                        graph_sampler =graph_sampler,crossval = crossval, name=name, mask=mask )
 
     def get(self, idx):
         epoch = self.epoch if self.split=='train' else self.val_epoch
         if self.dynamic_graph:
             data = torch.load(osp.join(self.processed_root, self.idxlist[idx]))
         else:
+            #print(osp.join(self.processed_fix_data_root, str(epoch), self.idxlist[idx]))
             data = torch.load(osp.join(self.processed_fix_data_root, str(epoch), self.idxlist[idx]))
+            #print(data)
         if self.feature_type == 'c':
             data.x = data.x[:,-2:]
         elif self.feature_type =='a':

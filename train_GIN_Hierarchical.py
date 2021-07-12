@@ -136,7 +136,7 @@ def gen_prefix(args):
     name +=  '_f' +args.feature_type
     name += '_%' + str(args.sample_ratio)
     # name += '_' + args.sample_method
-    name +=args.name
+    name += '_name' + args.name
 
     if args.load_data_sparse:
         name += '_sp'
@@ -268,7 +268,8 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
         total_time = 0
         avg_loss = 0.0
         model.train()
-        dataset.dataset.set_epoch(epoch)
+        if args.name == 'fuse':
+            dataset.dataset.set_epoch(epoch)
 
 
         for batch_idx, data in enumerate(dataset):
@@ -310,7 +311,7 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                     best_val_result['img_acc'] =  val_result['img_acc']
                     best_val_result['epoch'] = epoch
                     is_best = True
-                    print('Saveing best weight file to {}'.format(save_path))
+                    print('Saving best weight file to {}'.format(save_path))
                     save_checkpoint({'epoch': epoch + 1,
                                      'loss': avg_loss,
                                      'state_dict': model.state_dict() if torch.cuda.device_count() < 2 else model.module.state_dict(),

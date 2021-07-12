@@ -5,13 +5,14 @@ import torch
 
 
 
-path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_fuse_cia_knn'
+#path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_fuse_cia_knn'
+path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_avg_cia_knn'
 
 sub_folder = ['fold_1', 'fold_2', 'fold_3']
 mean = {
-    1:np.array([0] * 16),
-    2:np.array([0] * 16),
-    3:np.array([0] * 16),
+    1:np.array([0] * 18),
+    2:np.array([0] * 18),
+    3:np.array([0] * 18),
 }
 count = [0, 0, 0]
 sums = {
@@ -43,9 +44,9 @@ print('mean')
 print(sums[0] / count[0], sums[1] / count[1], sums[2] / count[2])
 
 std = {
-    0:np.array([0] * 16),
-    1:np.array([0] * 16),
-    2:np.array([0] * 16),
+    0:np.array([0] * 18),
+    1:np.array([0] * 18),
+    2:np.array([0] * 18),
 }
 
 count = [0, 0, 0]
