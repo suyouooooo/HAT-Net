@@ -95,3 +95,11 @@ test_can_be_del/
 test_can_be_del2/
 tile_01_01.png
 tttt.py
+cache
+fold_2_can_be_del
+fold_3_can_be_del
+junk_can_be_del
+lmdb_fold2_can_be_del
+lmdb_fold3_can_be_del
+lmdb_writer_can_be_del
+res_cv1

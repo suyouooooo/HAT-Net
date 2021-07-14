@@ -28,9 +28,9 @@ class ImageFolder(ImageLists):
     def image_list(self):
         return self.image_names
 
-    #def read_image(self, image_path):
-    #    image = cv2.imread(image_path, -1)
-    #    return image
+    def read_image(self, image_path):
+        image = cv2.imread(image_path, -1)
+        return image
 
 class ImageLMDB(ImageLists):
     pass
@@ -62,11 +62,11 @@ class BaseDataset:
         return res
 
     @property
-    def image_names(self):
+    def image_path_lists(self):
         res = []
         for k, v in self.image_grids.items():
             v = v[:-self.border + 1, :-self.border + 1]
-            print(v.shape)
+            #print(v.shape)
             res.append(v.flatten())
 
         return np.hstack(res)
@@ -99,6 +99,9 @@ class BaseDataset:
 
     def get_image_by_path(self, path):
         r_idx, c_idx = self.imagefp2coords[path]
+        image_prefix = path.split('_grade_')[0]
+        #print(self.image_grids.keys()[0])
+        image_grid = self.image_grids[image_prefix]
         patch = image_grid[r_idx : r_idx+self.border, c_idx : c_idx+self.border]
         image = self.stich_images(patch)
         return path, image
@@ -110,7 +113,7 @@ class BaseDataset:
     def __getitem__(self, idx):
         image_idx = bisect.bisect_right(self.cum_sum, idx)
         #print(image_idx)
-        prefix = self.image_prefixes[image_idx]
+        prefix = self.file_prefixes[image_idx]
         image_grid = self.image_grids[prefix]
 
         if image_idx == 0:
@@ -125,8 +128,8 @@ class BaseDataset:
         patch = image_grid[r_idx : r_idx+self.border, c_idx : c_idx+self.border]
         path = image_grid[r_idx, c_idx]
         image = self.stich_images(patch)
-        assert image.shape[0] == 1792
-        assert image.shape[1] == 1792
+        assert image.shape[0] == self.image_size
+        assert image.shape[1] == self.image_size
 
         return path, image
 
@@ -244,12 +247,12 @@ class BaseDataset:
 
 
 
-image_folder = ImageFolder('test_can_be_del2/')
-dataset = BaseDataset(image_folder, 1792)
-print(len(dataset))
-
-for i in range(300):
-    dataset.vis_image(i, '/data/smb/数据集/结直肠/病理学/Extended_CRC/Original_Images/', 'test_can_be_del')
+#image_folder = ImageFolder('test_can_be_del2/')
+#dataset = BaseDataset(image_folder, 224)
+#print(len(dataset))
+##
+#for i in range(300):
+#    dataset.vis_image(i, '/data/smb/数据集/结直肠/病理学/Extended_CRC/Original_Images/', 'test_can_be_del')
 #for idx, image in enumerate(dataset):
     #pass
 #image = dataset[2200]
