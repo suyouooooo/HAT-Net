@@ -103,3 +103,6 @@ lmdb_fold2_can_be_del
 lmdb_fold3_can_be_del
 lmdb_writer_can_be_del
 res_cv1
+nohup.out
+res0
+res_test_cv1
