@@ -175,9 +175,6 @@ def normalization(pathlist):
     std = np.std(allins, 0)
     return norm, std
 
-
-
-
 class FarthestSampler2:
     def __init__(self):
         pass
@@ -208,13 +205,10 @@ class FarthestSampler:
             farthest_distance = np.minimum(farthest_distance, arr[farthest_pts[i]])
         return farthest_pts
 
-
 def filter_sampled_indice(indice, num):
     total = [i for i in range(num)]
     a = list(filter(lambda x:x not in indice, total))
     return a
-
-
 
 @torch.no_grad()
 def visualize_network(writer, net, tensor):
@@ -301,6 +295,77 @@ def compute_mean_and_std(dataset):
     mean = (mean_b.item() / 255.0, mean_g.item() / 255.0, mean_r.item() / 255.0)
     std = (std_b.item() / 255.0, std_g.item() / 255.0, std_r.item() / 255.0)
     return mean, std
+
+class Metric:
+    def __init__(self, normal_class_id=0):
+        self.normal_class_id = normal_class_id
+        self.image_prefix = dict()
+        self.image_label = dict()
+        #self.patch_acc = 0
+        #self.image_acc_mul = 0
+        #self.image_acc_bin = 0
+
+        self.total_patches = 0
+        self.correct_patches = 0
+
+        self.total_images = [0, 0, 0] # grade 1 grade 2 grade 3
+        self.correct_images = [0, 0, 0]
+
+    def update(self, preds, labels, pathes):
+        #if not self.image_prefix:
+        self.correct_patches += preds.cpu().eq(labels.cpu()).sum().item()
+        self.total_patches += len(labels)
+
+        preds = preds.tolist()
+        labels = labels.tolist()
+        #
+        for pred, label, path in zip(preds, labels, pathes):
+            prefix = path.split('_grade_')[0]
+            image_label = int(path.split('_grade_')[1][0]) - 1
+            #print(prefix)
+            if prefix not in self.image_prefix:
+                self.image_prefix[prefix] = [0, 0, 0]
+                self.image_label[prefix] = image_label
+
+            # add to image stats
+            self.image_prefix[prefix][pred] += 1
+
+    def patch_accuracy(self):
+        return self.correct_patches / self.total_patches
+
+    def image_acc_three_class(self):
+
+        correct = 0
+        total = 0
+        for key, value in self.image_prefix.items():
+            pred = value.index(max(value))
+            label = self.image_label[key]
+
+            correct += pred == label
+            total += 1
+
+        return correct / total
+
+    def image_acc_binary_class(self):
+        correct = 0
+        total = 0
+
+        for key, value in self.image_prefix.items():
+            pred = value.index(max(value))
+            label = self.image_label[key]
+
+            if label == self.normal_class_id:
+                if pred == self.normal_class_id:
+                    correct += 1
+            else:
+                if pred != self.normal_class_id:
+                    correct += 1
+
+            total  += 1
+
+        return correct / total
+
+
 
 if __name__ == '__main__':
     # pt_to_gexf('/data/hdd1/syh/PycharmProjects/CGC-Net/data/proto/coordinate/CRC/fold_4/2_low_grade/Patient_001_02_Low-Grade.npy','/data/hdd1/syh/PycharmProjects/CGC-Net/data/proto/fix_fuse_hover_knn/0/fold_1/1_normal')

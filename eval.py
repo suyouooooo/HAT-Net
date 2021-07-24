@@ -11,7 +11,7 @@ import argparse
 import os
 import json
 import time
-from common.utils import mkdirs, save_checkpoint, load_checkpoint, init_optim, output_to_gexf
+from common.utils import mkdirs, save_checkpoint, load_checkpoint, init_optim, output_to_gexf, Metric
 from torch.optim import lr_scheduler
 from model import network_GIN_Hierarchical
 from torch_geometric.nn import DataParallel
@@ -34,6 +34,7 @@ DATE_FORMAT = '%A_%d_%B_%Y_%Hh_%Mm_%Ss'
 TIME_NOW = datetime.now().strftime(DATE_FORMAT)
 
 def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
+    metric = Metric()
     model.eval()
     device = 'cuda:1' if torch.cuda.device_count()>1 else 'cuda:0'
     torch.cuda.empty_cache()
@@ -46,6 +47,7 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
         labels_n_time = []
 
         #print(test_time)
+        print(test_time)
         for _ in range(test_time):
             # test 5 times, each time the graph is constructed by the same method from that in train
             preds = []
@@ -68,6 +70,7 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
                 #    finaleval.patch_result(patch_name, torch.max(ypred, 1)[1].cpu().numpy())
 
                 #else:
+                #print(args.load_data_list)
                 if args.load_data_list:
                     patch_name = [dataset.dataset.idxlist[d.patch_idx.item()] for d in data]
                     label = torch.cat([d.y for d in data]).numpy()
@@ -77,19 +80,24 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
                     label = data.y.cpu().numpy()
                         #label = torch.cat([d.y for d in data]).numpy()
 
+                #print(data)
                 ypred = model(data)
-                    #print(ypred.shape)
-                    #print(data.y)
-                    #label = torch.cat([d.y for d in data]).numpy()
-                    #label = data.y.cpu().numpy()
-                labels.append(label)
-                finaleval.batch_patch_result(patch_name, torch.max(ypred, 1)[1].cpu().numpy())
-                _, indices = torch.max(ypred, 1)
-                preds.append(ypred.detach().cpu().numpy())
+                #print(patch_name)
+                #print(ypred.shape)
+                #pred = ypred
+                pred = torch.argmax(ypred, dim=-1)
+                #print(pred)
+                metric.update(pred, torch.tensor(label), patch_name)
 
-                if max_num_examples is not None:
-                    if (batch_idx+1)*args.batch_size > max_num_examples:
-                        break
+                #import sys; sys.exit()
+                #labels.append(label)
+                #finaleval.batch_patch_result(patch_name, torch.max(ypred, 1)[1].cpu().numpy())
+                #_, indices = torch.max(ypred, 1)
+                #preds.append(ypred.detach().cpu().numpy())
+
+                #if max_num_examples is not None:
+                #    if (batch_idx+1)*args.batch_size > max_num_examples:
+                #        break
 
                 #if args.visualization and (batch_idx+1)*args.batch_size<50:
                 #    # visualization only support in "not args.load_data_list == True and args.full_test_graph"
@@ -105,19 +113,24 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
                 #        assign_matrix_list_single_image = [f[i] for f in assign_matrix_list]
                 #        output_to_gexf( h0[i], adj[i], assign_matrix_list_single_image, save_name)
 
-            labels = np.concatenate(labels,0)
-            preds = np.concatenate(preds,0)
-            pred_n_times.append(preds[...,np.newaxis])
-            labels_n_time.append(labels[...,np.newaxis])
+            #labels = np.concatenate(labels,0)
+            #preds = np.concatenate(preds,0)
+            #pred_n_times.append(preds[...,np.newaxis])
+            #labels_n_time.append(labels[...,np.newaxis])
 
-        pred_n_times = np.concatenate(pred_n_times, -1)
-        labels_n_time = np.hstack(labels_n_time)
-        pred_n_times = np.mean(pred_n_times,-1)
-        labels_n_time = np.mean(labels_n_time,-1)
-        pred_n_times = np.argmax(pred_n_times,1)
+        #pred_n_times = np.concatenate(pred_n_times, -1)
+        #labels_n_time = np.hstack(labels_n_time)
+        #pred_n_times = np.mean(pred_n_times,-1)
+        #labels_n_time = np.mean(labels_n_time,-1)
+        #pred_n_times = np.argmax(pred_n_times,1)
 
-    multi_class_acc,binary_acc = finaleval.final_result()
-    result = {'patch_acc': metrics.accuracy_score(labels_n_time,pred_n_times), 'img_acc':multi_class_acc, 'binary_acc': binary_acc }
+    patch_acc = metric.patch_accuracy()
+    image_acc_three = metric.image_acc_three_class()
+    image_acc_bin = metric.image_acc_binary_class()
+
+    #multi_class_acc,binary_acc = finaleval.final_result()
+    #result = {'patch_acc': metrics.accuracy_score(labels_n_time,pred_n_times), 'img_acc':multi_class_acc, 'binary_acc': binary_acc }
+    result = {'patch_acc': patch_acc, 'img_acc':image_acc_three, 'binary_acc':  image_acc_bin}
     return result
 
 #def gen_prefix(args):
@@ -532,10 +545,10 @@ def main():
     #import sys
     #sys.exit()
     writer = None
-    if prog_args.visualization:
-        tb_logdir = os.path.join(settings.log_dir, gen_prefix(prog_args), TIME_NOW)
-        mkdirs([tb_logdir])
-        writer = SummaryWriter(log_dir=tb_logdir)
+    #if prog_args.visualization:
+    #    tb_logdir = os.path.join(settings.log_dir, gen_prefix(prog_args), TIME_NOW)
+    #    mkdirs([tb_logdir])
+    #    writer = SummaryWriter(log_dir=tb_logdir)
     #if os.path.exists()
     #tb_logdir = os.path.join()
     cell_graph(prog_args, writer=writer)
