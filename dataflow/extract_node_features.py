@@ -401,10 +401,10 @@ class ImageJson:
     def get_res_by_image_path(self, image_path):
         image_path = Path(image_path)
         rel_image_path = str(image_path.relative_to(self.image_folder))
-        _, image = self.image_dataset.get_file_by_path(str(image_path))
+        image = self.image_dataset.get_file_by_path(str(image_path))
         image = cv2.resize(image, (0,0), fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
         json_path = self.image2json_fp(image_path)
-        _, labels = self.json_dataset.get_file_by_path(json_path)
+        labels = self.json_dataset.get_file_by_path(json_path)
         #print(type(labels))
         bboxes, coords, mask = self.format_labels(labels)
         return rel_image_path, image, bboxes, coords, mask
@@ -413,10 +413,10 @@ class ImageJson:
     def __getitem__(self, idx):
         image_path = Path(self.image_lists[idx])
         rel_image_path = str(image_path.relative_to(self.image_folder))
-        _, image = self.image_dataset.get_file_by_path(str(image_path))
+        image = self.image_dataset.get_file_by_path(str(image_path))
         image = cv2.resize(image, (0,0), fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
         json_path = self.image2json_fp(image_path)
-        _, labels = self.json_dataset.get_file_by_path(json_path)
+        labels = self.json_dataset.get_file_by_path(json_path)
         #print(type(labels))
         bboxes, coords, mask = self.format_labels(labels)
         return image, rel_image_path, bboxes, coords, mask

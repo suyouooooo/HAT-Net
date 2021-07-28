@@ -20,8 +20,8 @@ _CROSS_VAL = {1:{'train':['fold_1', 'fold_2'], 'valid': ['fold_3']},
 
 }
 
-#_MEAN_CIA, _STD_CIA = MEAN_STD['res50_avg_cia']
-_MEAN_CIA, _STD_CIA = MEAN_STD['res50_add_cia']
+_MEAN_CIA, _STD_CIA = MEAN_STD['res50_avg_cia_ecrc']
+#_MEAN_CIA, _STD_CIA = MEAN_STD['res50_add_cia']
 ##############hand craf
 #_MEAN_CIA = {1:[ 1.44855589e+02,  1.50849152e+01,  4.16993829e+02, -9.89115031e-02,
 #         4.29073361e+00,  7.03308534e+00,  1.50311764e-01,  1.20372119e-01,

@@ -3,6 +3,7 @@ import numpy as np
 import sklearn.metrics as metrics
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 import torch.backends.cudnn as cudnn
 import pdb
@@ -36,25 +37,24 @@ TIME_NOW = datetime.now().strftime(DATE_FORMAT)
 def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
     metric = Metric()
     model.eval()
-    device = 'cuda:1' if torch.cuda.device_count()>1 else 'cuda:0'
+    #device = 'cuda:1' if torch.cuda.device_count()>1 else 'cuda:0'
     torch.cuda.empty_cache()
     #finaleval = ImgLevelResult(args)
     with torch.no_grad():
-        test_time = args.test_epoch if (args.dynamic_graph and name !='Train')else 1
-        if args.visualization:
-            test_time = 1
-        pred_n_times = []
-        labels_n_time = []
+        #test_time = args.test_epoch if (args.dynamic_graph and name !='Train')else 1
+        #if args.visualization:
+        #    test_time = 1
+        #pred_n_times = []
+        #labels_n_time = []
 
         #print(test_time)
-        for _ in range(test_time):
+        #for _ in range(test_time):
             # test 5 times, each time the graph is constructed by the same method from that in train
-            preds = []
-            labels = []
-            dataset.dataset.set_val_epoch(_)
+            #preds = []
+            #labels = []
+            #dataset.dataset.set_val_epoch(_)
 
-            print(test_time)
-            for batch_idx, data in enumerate(dataset):
+        for batch_idx, data in enumerate(dataset):
                 #print(len(dataset), batch_idx)
                 #if args.visualization:
                 #    patch_idx = data['patch_idx']
@@ -70,13 +70,14 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
                 #    finaleval.patch_result(patch_name, torch.max(ypred, 1)[1].cpu().numpy())
 
                 #else:
-                if args.load_data_list:
-                    patch_name = [dataset.dataset.idxlist[d.patch_idx.item()] for d in data]
-                    label = torch.cat([d.y for d in data]).numpy()
-                else:
-                    patch_name = [dataset.dataset.idxlist[patch_idx.item()] for patch_idx in data.patch_idx]
-                    data.to('cuda:0')
-                    label = data.y.cpu().numpy()
+            if args.load_data_list:
+                patch_name = [dataset.dataset.idxlist[d.patch_idx.item()] for d in data]
+                label = torch.cat([d.y for d in data]).numpy()
+            else:
+                patch_name = [dataset.dataset.idxlist[patch_idx.item()] for patch_idx in data.patch_idx]
+                #data.to('cuda:0')
+                label = data.y.cpu().numpy()
+                data = data.cuda()
                         #label = torch.cat([d.y for d in data]).numpy()
 
                 ypred = model(data)
@@ -209,24 +210,12 @@ def eval_idx(total_iters, num_evals):
 
     return intervals
 
-#def eval_idx(total_iters, num_evals):
-#    interval = total_iters // num_evals -
-#    print(interval)
-#    first_interval = total_iters - interval * num_evals
-#    intervals = []
-#    intervals.append(first_interval - 1)
-#    for i in range(num_evals):
-#        intervals.append(interval + intervals[-1] )
-#
-#    print(intervals)
-#    return intervals
-
 def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=None, checkpoint = None):
     print('train data loader type', type(dataset))
     print('val data loader type', type(val_dataset))
     print('model type', type(model))
     print("==> Start training")
-    device = 'cuda:1' if torch.cuda.device_count()>1 else 'cuda:0'
+    #device = 'cuda:1' if torch.cuda.device_count()>1 else 'cuda:0'
     start_epoch = 0
     optimizer = init_optim(args.optim, model.parameters(), args.lr, args.weight_decay)
     if checkpoint is not None:
@@ -235,27 +224,27 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
 
     if args.step_size > 0:
         scheduler = lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
-    cudnn.benchmark = True
-    val_result={
-            'epoch': 0,
-            'loss': 0,
-            'img_acc': 0,
-            'patch_acc': 0 }
-    best_val_result = {
-            'epoch': 0,
-            'loss': 0,
-            'img_acc': 0,
-            'patch_acc': 0 }
-    test_result = {
-            'epoch': 0,
-            'loss': 0,
-            'img_acc': 0,
-            'patch_acc':0}
-    best_val_accs = []
-    best_val_epochs = []
-    test_accs = []
-    test_epochs = []
-    val_accs = []
+    #cudnn.benchmark = True
+    #val_result={
+    #        'epoch': 0,
+    #        'loss': 0,
+    #        'img_acc': 0,
+    #        'patch_acc': 0 }
+    #best_val_result = {
+    #        'epoch': 0,
+    #        'loss': 0,
+    #        'img_acc': 0,
+    #        'patch_acc': 0 }
+    #test_result = {
+    #        'epoch': 0,
+    #        'loss': 0,
+    #        'img_acc': 0,
+    #        'patch_acc':0}
+    ##best_val_accs = []
+    #best_val_epochs = []
+    #test_accs = []
+    #test_epochs = []
+    #val_accs = []
     save_path = os.path.join(args.resultdir, gen_prefix(args), TIME_NOW)
     #num_eval = args.num_eval
     #iter_num = len(dataset) // num_eval
@@ -270,29 +259,28 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
     #print()
     #tensor = torch.Tensor(1, 3, 16)
 
-    write_network = True
+    #write_network = True
+    best_val_result = {'patch_acc': 0, 'img_acc': 0, 'binary_acc': 0}
+
 
     eval_idxes = eval_idx(len(dataset), args.num_eval)
-    print(eval_idxes)
+    #print(eval_idxes)
     if args.visualization:
         eval_count = 0
     for epoch in range(start_epoch, args.num_epochs):
         epoch_start = time.time()
-        torch.cuda.empty_cache()
-        total_time = 0
-        avg_loss = 0.0
+        #torch.cuda.empty_cache()
+        #total_time = 0
+        #avg_loss = 0.0
         model.train()
         if args.name == 'fuse':
             dataset.dataset.set_epoch(epoch)
 
-
         for batch_idx, data in enumerate(dataset):
             if not args.load_data_list:
-                data.to(device)
+                data = data.cuda()
 
-            _, cls_loss = model(data)
-            cls_loss = torch.mean(cls_loss)
-            loss = cls_loss
+            _, loss = model(data)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -311,41 +299,50 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                 visualize_scalar(writer, 'Train/loss', loss.item(), n_iter)
                 visualize_scalar(writer, 'Train/lr', optimizer.param_groups[0]['lr'], n_iter)
 
-
-
             #print(eval_idxes)
             if batch_idx in eval_idxes:
                 eval_start = time.time()
                 print('Evaluating at {}th iterations.......'.format(batch_idx))
                 #print(eval_idxes)
                 val_result = evaluate(val_dataset, model, args, name='Validation')
-                val_accs.append(val_result['patch_acc'])
+                #val_accs.append(val_result['patch_acc'])
                 if val_result['img_acc'] > best_val_result['img_acc'] - 1e-7:
-                    best_val_result['patch_acc'] = val_result['patch_acc']
                     best_val_result['img_acc'] =  val_result['img_acc']
-                    best_val_result['epoch'] = epoch
-                    is_best = True
+                    #best_val_result['epoch'] = epoch
+                    #is_best = True
                     print('Saving best weight file to {}'.format(save_path))
                     save_checkpoint({'epoch': epoch + 1,
-                                     'loss': avg_loss,
                                      'state_dict': model.state_dict() if torch.cuda.device_count() < 2 else model.module.state_dict(),
                                      'optimizer': optimizer.state_dict(),
                                      'val_acc': val_result},
-                                    is_best, os.path.join(save_path, 'weight.pth.tar'.format(epoch)))
-                model.train()
-                print('Epoch: {}, Eval time consumed: {:0.4f}s, Val patch acc: {:0.6f}, Val image acc: {:0.6f}, Best val acc: {:0.6f}'.format(
-                    epoch,
-                    time.time() - eval_start,
-                    val_result['patch_acc'],
-                    val_result['img_acc'],
-                    best_val_result['img_acc']
-                ))
-                print(val_result)
+                                    os.path.join(save_path, 'model_best.pth.tar'))
+
+                if val_result['patch_acc'] > best_val_result['patch_acc'] - 1e-7:
+                    best_val_result['patch_acc'] = val_result['patch_acc']
+
+                if val_result['binary_acc'] > best_val_result['binary_acc'] - 1e-7:
+                    best_val_result['binary_acc'] = val_result['binary_acc']
+                #model.train()
+                print(('Epoch: {}, eval time consumed: {:0.4f}s, val patch acc: {:0.6f}, val image acc: {:0.6f}, val binary acc: {:0.6f}, '
+                        'best val patch acc: {:0.6f}, best val image acc: {:0.6f}, best val binary acc: {:0.6f}').format(
+                        epoch,
+                        time.time() - eval_start,
+                        val_result['patch_acc'],
+                        val_result['img_acc'],
+                        val_result['binary_acc'],
+                        best_val_result['patch_acc'],
+                        best_val_result['img_acc'],
+                        best_val_result['binary_acc'],
+                    ))
+                #print('Best result is: {:0.4f}', )
+                print()
                 if args.visualization:
                     eval_count += 1
                     visualize_scalar(writer, 'Val/patch_acc', val_result['patch_acc'],  eval_count)
                     visualize_scalar(writer, 'Val/image_acc', val_result['img_acc'],  eval_count)
                     visualize_scalar(writer, 'Val/binary_acc', val_result['binary_acc'],  eval_count)
+
+                model.train()
 
         if args.step_size > 0:
             scheduler.step()
@@ -354,7 +351,6 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
             time.time() - epoch_start
         ))
 
-    return model, val_accs
 
 def cell_graph(args, writer = None):
     # val==test loader since we do cross-val
@@ -364,6 +360,10 @@ def cell_graph(args, writer = None):
     input_dim = args.input_feature_dim
     if args.task == 'CRC':
         args.num_classes = 3
+    elif args.task == 'ECRC':
+        args.num_classes = 3
+    else:
+        raise ValueError('wrong task name')
     # model = atten_network.SpGAT(18,args.hidden_dim,3, args.drop_out, args.assign_ratio,3)
     if args.network == 'HGTIN':
         model = network_GIN_Hierarchical.SoftPoolingGcnEncoder(setting.max_num_nodes,
@@ -393,7 +393,13 @@ def cell_graph(args, writer = None):
                                               jk=args.jump_knowledge
                                               )
 
-    print(model)
+    #print(model)
+    if args.cross_val == 1:
+        model_path = '/home/baiyu/HGIN/output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_nameavg_adj0.4_ECRC_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs35_lr0.001_networkHGTIN_gamma0.1/Wednesday_28_July_2021_20h_49m_55s/model_best.pth.tar'
+        print('loading file from {}'.format(model_path))
+        model.load_state_dict(torch.load(model_path)['state_dict'])
+        print('done')
+
     #tensor = torch.Tensor(3, 10, 16)
     if(args.resume):
         if args.resume == 'best':
@@ -423,14 +429,11 @@ def cell_graph(args, writer = None):
     if not args.skip_train:
         # 如果不跳过训练，就执行下面的操作
         if args.resume:
-            _, val_accs = train(train_loader, model, args, val_dataset=val_loader, test_dataset=None,
-            writer=writer, checkpoint = checkpoint)
+            train(train_loader, model, args, val_dataset=val_loader, test_dataset=None, writer=writer, checkpoint = checkpoint)
         else:
-            _, val_accs = train(train_loader, model, args, val_dataset=val_loader, test_dataset=None,
-            writer=writer, )
-        print('finally: max_val_acc:%f'%max(val_accs))
+            train(train_loader, model, args, val_dataset=val_loader, test_dataset=None, writer=writer)
+        #print('finally: max_val_acc:%f'%max(val_accs))
     #_ = evaluate(test_loader, model, args, name='Validation', max_num_examples=None)
-    print(_)
 
 def arg_parse():
     data_setting = DataSetting()

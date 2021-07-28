@@ -91,11 +91,11 @@ def output_to_gexf(coordinate, adj, assign_matrix_list, path):
     nx.write_gexf(G, path)
 
 # load save functions
-def save_checkpoint(state, is_best, fpath='checkpoint.pth.tar'):
+def save_checkpoint(state, fpath='checkpoint.pth.tar'):
     mkdirs(os.path.dirname(fpath))
     torch.save(state, fpath)
-    if is_best:
-        shutil.copy(fpath, os.path.join(os.path.dirname(fpath), 'model_best.pth.tar'))
+    #if is_best:
+    #    shutil.copy(fpath, os.path.join(os.path.dirname(fpath), 'model_best.pth.tar'))
 
 def load_checkpoint(fpath):
     if os.path.isfile(fpath):
