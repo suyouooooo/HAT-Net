@@ -1,6 +1,6 @@
 #!/bin/bash
 #export CUDA_VISIBLE_DEVICES=1 && python train_HGP_GCN.py --batch_size 10
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=1
 export CUDA_HOME=$CUDA_HOME:/home/syh/cuda-11.0
 export PATH=$PATH:/home/syh/cuda-11.0/bin
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/syh/cuda-11.0/lib64
@@ -12,9 +12,11 @@ which python
 conda activate CGC-Net2-tensorboard
 #cd /data/by/tmp/HGIN
 
+python /data/by/tmp/HGIN/dataflow/extract_node_features.py
 #python /data/by/tmp/HGIN/dataflow/prepare_cv_dataset_no_random.py
 #python /data/by/tmp/HGIN/HGIN/common/utils.py
-python  /data/by/tmp/HGIN/dataflow/prepare_cv_dataset_no_random.py
+#python  /data/by/tmp/HGIN/dataflow/prepare_cv_dataset_no_random.py
+#python /data/by/tmp/HGIN/dataflow/prepare_cv_dataset_test.py
 
 #python -u train_consep.py -net resnet50 -b 512 -lr 0.1 -gpu -e 200
 #python -u train_consep.py -net resnet50 -b 512 -lr 0.1 -gpu -e 200
