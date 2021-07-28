@@ -184,7 +184,7 @@ class BaseDataset:
         file_grid = self.file_grids[image_prefix]
         patch = file_grid[r_idx : r_idx+self.border, c_idx : c_idx+self.border]
         data = self.stich_files(patch)
-        return path, data
+        return data
 
     #abstrct
     def assert_data(data):
@@ -406,8 +406,6 @@ class LMDBDataset(BaseDataset):
         #            res.append(v)
         node_features = np.vstack(node_features)
         node_coords = np.vstack(node_coords)
-        print(node_features.shape)
-        print(node_coords.shape)
         #print(res[33], 333333333)
 
         return {'feat' : node_features, 'coord' : node_coords}
@@ -530,7 +528,7 @@ def draw_nuclei(image, json_label):
 #print(len(image_dataset))
 #a = json_dataset[33]
 #
-#image_files = image_dataset.file_path_lists
+#image_files = image_datasnt.file_path_lists
 #json_files = json_dataset.file_path_lists
 #
 #print('json_files', len(json_files))
