@@ -3,11 +3,13 @@ import os
 import re
 import bisect
 import json
+import string
+import pickle
+from pathlib import Path
 
 import cv2
 import numpy as np
-#from matplotlib import plot as plt
-import matplotlib.pyplot as plt
+import lmdb
 
 
 #class BaseLists:
@@ -71,7 +73,32 @@ class ImageFolder(BaseLists):
     #    image = cv2.imread(image_path, -1)
     #    return image
 
+class LMDBFolder(BaseLists):
+    def __init__(self, path):
+        self.env = lmdb.open(path, map_size=1099511627776, readonly=True, lock=False)
+        #with self.env.begin(write=False) as txn:
+        #    self.image_names= [key.decode() for key in txn.cursor().iternext(keys=True, values=False)]
 
+        cache_file = '_cache_' + ''.join(c for c in path if c in string.ascii_letters)
+        cache_path = os.path.join(path, cache_file)
+        if os.path.isfile(cache_path):
+            self.npy_names = pickle.load(open(cache_path, "rb"))
+        else:
+            with self.env.begin(write=False) as txn:
+                self.npy_names = [key for key in txn.cursor().iternext(keys=True, values=False)]
+            pickle.dump(self.npy_names , open(cache_path, "wb"))
+
+        self.npy_names = [key.decode() for key in self.npy_names]
+
+    def file_list(self):
+        return self.npy_names
+
+    def read_file(self, npy_path):
+        #image = cv2.imread(image_path, -1)
+        with self.env.begin(write=False) as txn:
+            data = txn.get(npy_path.encode())
+            data = pickle.loads(data)
+        return data
 
 class BaseDataset:
     def __init__(self, file_list, image_size):
@@ -326,6 +353,65 @@ class ImageDataset(BaseDataset):
             print(base_name, idx)
             cv2.imwrite(os.path.join(save_folder, base_name), image)
 
+class LMDBDataset(BaseDataset):
+    def assert_data(self, val):
+        assert 'feat' in val
+        assert 'coord' in val
+
+    def stich_files(self, patch):
+        #res = []
+        node_features = []
+        node_coords = []
+
+        #print(patch)
+        #for fp in patch.flatten():
+        row, col = patch.shape[:2]
+        for r_idx in range(row):
+            for c_idx in range(col):
+                fp = patch[r_idx, c_idx]
+                nodes = self.file_list.read_file(fp)
+                #print(r_idx, c_idx, len(nodes))
+                #for node in nodes:
+                    # centeroid [x, y] # /data/by/tmp/hover_net/models/hovernet/post_proc.py  process
+                    #node['centroid'][0] /= 2
+                    #node['centroid'][1] /= 2
+                    #print(node['centroid'])
+                nodes['coord'][:, 0] += r_idx * 224 * 2
+                nodes['coord'][:, 1] += c_idx * 224 * 2
+                #node['bbox'][0][0]
+                #node['bbox'][0][0] += r_idx * 224 * 2
+                #node['bbox'][0][1] += c_idx * 224 * 2
+                #node['bbox'][1][0] += r_idx * 224 * 2
+                #node['bbox'][1][1] += c_idx * 224 * 2
+
+                #print(node['contour'])
+                #print(type(node['contour']))
+                #node['contour'][:, 0] += r_idx * 224 * 2
+                #node['contour'][:, 1] += c_idx * 224 * 2
+                #print(node['contour'])
+                #node['contour'] = [[c1 + c_idx * 224 * 2, c2 + r_idx * 224 * 2] for [c1, c2] in node['contour']]
+                #print(node['contour'])
+
+                #import sys; sys.exit()
+
+                #node['centroid'][0] /= 2
+                #node['centroid'][1] /= 2
+                #print(node['centroid'])
+                node_features.append(nodes['feat'])
+                node_coords.append(nodes['coord'])
+                #res.append(nodes)
+        #    with open(fp) as f:
+        #        data = json.load(fp)
+        #        for v in data['nuc'].values():
+        #            res.append(v)
+        node_features = np.vstack(node_features)
+        node_coords = np.vstack(node_coords)
+        print(node_features.shape)
+        print(node_coords.shape)
+        #print(res[33], 333333333)
+
+        return {'feat' : node_features, 'coord' : node_coords}
+
 
 class JsonDataset(BaseDataset):
     def assert_data(self, data):
@@ -395,17 +481,44 @@ def draw_nuclei(image, json_label):
 
     return image
 
-#image_folder = ImageFolder('/data/by/tmp/HGIN/test_can_be_del3/')
-#image_dataset = ImageDataset(image_folder, 1792)
+#image_folder = ImageFolder('/home/baiyu/Extended_CRC')
+#image_dataset = ImageDataset(image_folder, 224 * 3)
+#lmdb_folder = LMDBFolder('/data/smb/syh/PycharmProjects/CGC-Net/data_lmdb/extended_crc/feat/')
+#feat_dataset = LMDBDataset(lmdb_folder, 224 * 3)
+#print(len(image_dataset))
+#print(len(feat_dataset))
+
+#import random
+#path, image = random.choice(image_dataset)
 #
-#prefixes = image_dataset.file_prefixes
-#print(len(prefixes))
-#import cv2
-#for p in prefixes:
-    #image = image_dataset.whole_file(p)
-    #print(image.shape, p)
-    #image = cv2.resize(image, (0, 0), fx=0.1, fy=0.1)
-    #cv2.imwrite(os.path.join('tmp', p + '.jpg'), image)
+#print(path)
+#base_name = os.path.basename(path).replace('.png', '.npy')
+#lmdb_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_lmdb/extended_crc/feat/'
+#
+#image_path = Path(path)
+#sub_folder = os.path.dirname(image_path.relative_to('/home/baiyu/Extended_CRC'))
+#print(sub_folder)
+#
+#
+#npy_path = os.path.join(sub_folder, base_name)
+##print(npy_path)
+#_, res = feat_dataset.get_file_by_path(npy_path)
+#coords = res['coord']
+#for cen in coords:
+#    cen = [int(c // 2) for c in cen]
+#    image = cv2.circle(image, tuple(cen[::-1]), 3, (0, 200, 0), cv2.FILLED, 3)
+#
+#cv2.imwrite('/home/baiyu/HGIN/heihei_del11.png', image)
+
+
+
+#print(res)
+#s = image_dataset.file_prefixes
+#print(s[10])
+#print(path)
+#s = feat_dataset.file_prefixes
+#print(s[10])
+#s = feat_dataset.get_file_by_path
 #image_dataset.vis_image('/data/smb/数据集/结直肠/病理学/Extended_CRC/Original_Images/', 'tmp')
 #sys.exit()
 #
