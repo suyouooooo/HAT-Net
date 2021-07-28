@@ -243,24 +243,32 @@ if __name__ == '__main__':
         print(i + '.npy')
         #nodes_features = np.load(i + '.npy')
         data = _read_one_raw_graph(i)
-        print(data)
-        clusters = grid_cluster(data.pos, torch.Tensor([64, 64]))
-        #print(data.pos)
-        #print(clusters[clusters == 1])
-        #print(np.unique(clusters))
-        #for i in np.unique(clusters):
-        print(clusters)
-        print(clusters[2295 == clusters])
-        mask = clusters == 2295
-        print(clusters.max(), 11)
-        print(mask)
-        print(data.x[mask])
-        data = add_pool(clusters, data)
-        print(data)
-           #print(i)
+        x = data.x[:10]
+        pos = data.pos[:10]
+        clusters = [0, 0, 1, 1, 1, 2, 3, 3, 3, 4]
 
-        clusters = grid_cluster(data.pos, torch.Tensor([64, 64]), start=0, end=torch.Tensor([1792]))
-        print(clusters.max())
+        print(x)
+        print(x[6] + x[7] + x[8])
+        print('after....')
+        data = add_pool(torch.tensor(clusters), Data(x=x, pos=pos))
+        print(data.x[3])
+        #clusters = grid_cluster(data.pos, torch.Tensor([64, 64]))
+        ##print(data.pos)
+        ##print(clusters[clusters == 1])
+        ##print(np.unique(clusters))
+        ##for i in np.unique(clusters):
+        #print(clusters)
+        #print(clusters[2295 == clusters])
+        #mask = clusters == 2295
+        #print(clusters.max(), 11)
+        #print(mask)
+        #print(data.x[mask])
+        #data = add_pool(clusters, data)
+        #print(data)
+        #   #print(i)
+
+        #clusters = grid_cluster(data.pos, torch.Tensor([64, 64]), start=0, end=torch.Tensor([1792]))
+        #print(clusters.max())
         #print(torch.ops.torch_cluster)
         #print(clusters == 2295)
 

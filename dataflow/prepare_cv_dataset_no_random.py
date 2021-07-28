@@ -38,6 +38,24 @@ def avg_pool(cluster, data):
 
     return data
 
+def _add_pool_x(cluster, x, size=None):
+    return scatter(x, cluster, dim=0, dim_size=size, reduce='add')
+
+def add_pool(cluster, data):
+    cluster, perm = consecutive_cluster(cluster)
+    x = None if data.x is None else _add_pool_x(cluster, data.x)
+    pos = None if data.pos is None else pool_pos(cluster, data.pos)
+    data.x = x
+    #print(data.x.shape)
+    #print(data.x[:, -2:])
+    #print(data.pos[:, -2:])
+    #print(data.x[:,-2].shape)
+    data.x[:, -2:] = pos
+    data.pos = pos
+    #print(data.x[:, -2:])
+    #print(pos.shape)
+
+    return data
 
 #def avg_coord(coordinates, size):
 #    clusters = grid_cluster(coordinates, torch.Tensor([size, size]))
@@ -118,7 +136,7 @@ def gen(raw_path):
     graph_sampler = 'knn'
     mask = 'cia'
     #sample_method= 'fuse'
-    sample_method= 'avg'
+    sample_method= 'add'
     setting = CrossValidSetting()
     processed_dir = os.path.join(setting.root, 'proto',
                                  'fix_%s_%s_%s' % (sample_method, mask, graph_sampler))
@@ -143,7 +161,8 @@ def gen(raw_path):
        #    if torch.is_tensor(item) and item.size(0) == num_nodes:
        #        subdata[key] = item[choice]
        clusters = grid_cluster(subdata.pos, torch.Tensor([64, 64]))
-       subdata = avg_pool(clusters, subdata)
+       #subdata = avg_pool(clusters, subdata)
+       subdata = add_pool(clusters, subdata)
 
        # generate the graph
        if graph_sampler == 'knn':
@@ -162,8 +181,10 @@ def gen(raw_path):
        #print(data.pos[3].long(), avg_data.pos[3].long())
        #print()
 
+       #print(subdata)
 
        #print('before', data.x.shape, 'after:', subdata.x.shape)
+
        torch.save(subdata, osp.join(processed_dir,str(i),
                                  raw_path.split('/')[-3],
                                     raw_path.split('/')[-1].split('.')[0] + '.pt'))
@@ -194,7 +215,7 @@ if __name__ == '__main__':
     original_files = []
     sampling_ratio = 0.5
     #sample_method = 'fuse'
-    sample_method = 'avg'
+    sample_method = 'add'
     mask = 'cia'
     graph_sampler = 'knn'
     epoch = 1
