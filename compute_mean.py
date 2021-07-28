@@ -6,7 +6,7 @@ import torch
 
 
 #path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_fuse_cia_knn'
-path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_avg_cia_knn'
+path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_add_cia_knn'
 
 sub_folder = ['fold_1', 'fold_2', 'fold_3']
 mean = {

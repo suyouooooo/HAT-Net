@@ -164,9 +164,9 @@ def gen(raw_path):
 
 
        #print('before', data.x.shape, 'after:', subdata.x.shape)
-       torch.save(subdata, osp.join(processed_dir,str(i),
-                                 raw_path.split('/')[-3],
-                                    raw_path.split('/')[-1].split('.')[0] + '.pt'))
+       #torch.save(subdata, osp.join(processed_dir,str(i),
+       #                          raw_path.split('/')[-3],
+       #                             raw_path.split('/')[-1].split('.')[0] + '.pt'))
 
 #def _sampling( num_sample, ratio, distance = None):
 #    num_subsample = int(num_sample * ratio)

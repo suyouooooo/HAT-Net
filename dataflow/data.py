@@ -20,7 +20,8 @@ _CROSS_VAL = {1:{'train':['fold_1', 'fold_2'], 'valid': ['fold_3']},
 
 }
 
-_MEAN_CIA, _STD_CIA = MEAN_STD['res50_avg_cia']
+#_MEAN_CIA, _STD_CIA = MEAN_STD['res50_avg_cia']
+_MEAN_CIA, _STD_CIA = MEAN_STD['res50_add_cia']
 ##############hand craf
 #_MEAN_CIA = {1:[ 1.44855589e+02,  1.50849152e+01,  4.16993829e+02, -9.89115031e-02,
 #         4.29073361e+00,  7.03308534e+00,  1.50311764e-01,  1.20372119e-01,
@@ -359,7 +360,6 @@ class NucleiDataset(Dataset):
             adj[adj>0] = 1
             adj_all[: sample_num_node, :sample_num_node] = adj
         else:
-            # print("NucleiDataset data path is : " + str(osp.join(self.processed_fix_data_root, str(self.epoch), self.idxlist[idx])))
             data = torch.load(osp.join(self.processed_fix_data_root, str(self.epoch), self.idxlist[idx]))
             if self.graph_sampler == 'knn':
                 edge_index = radius_graph(data.pos, self.max_edge_distance, None, True, self.max_neighbours)
