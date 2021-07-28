@@ -10,6 +10,7 @@ class CrossValidSetting:
         # processed
         #self.root = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning'#'/research/dept6/ynzhou/gcnn/data'
         self.root = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/'#'/research/dept6/ynzhou/gcnn/data'
+        #self.root = '/home/baiyu/Extended_CRC_Graph'#'/research/dept6/ynzhou/gcnn/data'
         self.save_path = 'output'
         self.log_path = os.path.join(self.save_path,'log' )
         self.result_path = os.path.join(self.save_path, 'result')
