@@ -122,7 +122,27 @@ heihei_del.png
 heihei_del1.png
 heihei_del11.png
 res_add
+<<<<<<< HEAD
 Extended_CRC_Graph/
 ecrc_res
 ecrc_res1
 teaaaa.py
+=======
+1792x2_pool64
+*.png
+ecrc_20epoch
+ecrc_adam
+ecrc_res
+ecrc_res1
+ecrc_res2
+ecrc_sgd
+heihei
+lr0.005_cv1_cv3
+print_grad
+print_grad1
+res_ecrc
+run1.py
+std
+t.py
+tttttt
+>>>>>>> 291271772faf61621a40471bcd3db2c151010037

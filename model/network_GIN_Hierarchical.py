@@ -138,7 +138,7 @@ class Transformer(nn.Module):
             x = ff(x) + x
         return x
 ######
-
+#
 class SoftPoolingGcnEncoder(nn.Module):
     def __init__(self, max_num_nodes, input_dim, hidden_dim, embedding_dim, bias, bn, assign_hidden_dim,label_dim,
                  assign_ratio=0.25,  pred_hidden_dims=[50], concat = True, gcn_name='SAGE',

@@ -46,23 +46,23 @@ def stich(pathes):
     return image
 
 
-#src_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/raw/CRC/'
+src_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/raw/CRC/'
 #
 #
 #split_image = ''
 #
 #
-#res = cluster(glob.iglob(os.path.join(src_path, '**', '*.png'), recursive=True))
+res = cluster(glob.iglob(os.path.join(src_path, '**', '*.png'), recursive=True))
 #
-#count = 0
-#for k, v in res.items():
-#    count += 1
-#    print(k, len(v), 1111)
-#    print(v[0])
-#    print(count)
-#    print(coords(v[0]))
-#    image = stich(v)
-#    image = cv2.resize(image, (0, 0), fx=0.3, fy=0.3)
-#    cv2.imwrite('test.png', image)
-#
-#    import sys;sys.exit()
+count = 0
+for k, v in res.items():
+    count += 1
+    print(k, len(v), 1111)
+    print(v[0])
+    print(count)
+    print(coords(v[0]))
+    image = stich(v)
+    image = cv2.resize(image, (0, 0), fx=0.1, fy=0.1)
+    cv2.imwrite('testaa.png', image)
+
+    import sys;sys.exit()
