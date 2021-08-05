@@ -138,7 +138,7 @@ class Transformer(nn.Module):
             x = ff(x) + x
         return x
 ######
-
+#
 class SoftPoolingGcnEncoder(nn.Module):
     def __init__(self, max_num_nodes, input_dim, hidden_dim, embedding_dim, bias, bn, assign_hidden_dim,label_dim,
                  assign_ratio=0.25,  pred_hidden_dims=[50], concat = True, gcn_name='SAGE',
@@ -206,8 +206,6 @@ class SoftPoolingGcnEncoder(nn.Module):
 
 
         pred_input = input_dim * 3
-        self.pred_model = self.build_readout_module(pred_input, pred_hidden_dims,
-                                                    label_dim, activation)
 
 
         #self.pos_emb = nn.Parameter(torch.randn(1, 114, 20))
@@ -226,12 +224,19 @@ class SoftPoolingGcnEncoder(nn.Module):
 
         self.stage = stage
 
-        self.mlp = nn.Sequential(
-            nn.Linear(pred_input , pred_input), # pred_input 60
-            nn.ReLU(),
-            nn.Linear(pred_input, pred_input // 2),
-            nn.ReLU(),
-            nn.Linear(pred_input // 2, label_dim))
+        self.pred_model = self.build_readout_module(pred_input, pred_hidden_dims,
+                                                    label_dim, activation)
+
+        #self.mlp = nn.Sequential(
+        #    nn.Linear(pred_input , pred_input, bias=False), # pred_input 60
+        #    nn.ReLU(),
+        #    nn.Linear(pred_input, pred_input // 2, bias=False),
+        #    nn.ReLU(),
+        #    nn.Linear(pred_input // 2, label_dim, bias=False)
+
+        #print(self.mlp)
+        #print()
+        #print(self.pred_model)
 
     @staticmethod
     def construct_mask( max_nodes, batch_num_nodes):
@@ -461,9 +466,9 @@ class SoftPoolingGcnEncoder(nn.Module):
         out_all.append(out)  # out_all[0].size() torch.Size([1, 20])
         output = torch.cat(out_all, 1) # output.size() torch.Size([1, 60])
 
-        # output = self.pred_model(output)
+        output = self.pred_model(output)
 
-        output = self.mlp(output)
+        #output = self.mlp(output)
 
         # # new readout
         # # change int num_node to Long Tensors

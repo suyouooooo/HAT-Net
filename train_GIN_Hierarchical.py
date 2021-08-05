@@ -37,91 +37,22 @@ TIME_NOW = datetime.now().strftime(DATE_FORMAT)
 def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
     metric = Metric()
     model.eval()
-    #device = 'cuda:1' if torch.cuda.device_count()>1 else 'cuda:0'
     torch.cuda.empty_cache()
-    #finaleval = ImgLevelResult(args)
     with torch.no_grad():
-        #test_time = args.test_epoch if (args.dynamic_graph and name !='Train')else 1
-        #if args.visualization:
-        #    test_time = 1
-        #pred_n_times = []
-        #labels_n_time = []
-
-        #print(test_time)
-        #for _ in range(test_time):
-            # test 5 times, each time the graph is constructed by the same method from that in train
-            #preds = []
-            #labels = []
-            #dataset.dataset.set_val_epoch(_)
-
         for batch_idx, data in enumerate(dataset):
-                #print(len(dataset), batch_idx)
-                #if args.visualization:
-                #    patch_idx = data['patch_idx']
-                #    patch_name = dataset.dataset.idxlist[patch_idx.item()]
-                #    adj = data['adj'].to(device)
-                #    h0 = data['feats'].to(device)
-                #    label = data['label']
-                #    # coor = data['coor']
-                #    label = label[:, 0].numpy()
-                #    labels.append(label)
-                #    batch_num_nodes = data['num_nodes'].cuda()
-                #    ypred = model((h0, adj, batch_num_nodes))
-                #    finaleval.patch_result(patch_name, torch.max(ypred, 1)[1].cpu().numpy())
 
-                #else:
             if args.load_data_list:
                 patch_name = [dataset.dataset.idxlist[d.patch_idx.item()] for d in data]
                 label = torch.cat([d.y for d in data]).numpy()
             else:
                 patch_name = [dataset.dataset.idxlist[patch_idx.item()] for patch_idx in data.patch_idx]
-                #data.to('cuda:0')
                 label = data.y.cpu().numpy()
-                data = data.cuda()
-                        #label = torch.cat([d.y for d in data]).numpy()
+                #data = data.cuda()
+                data.to('cuda:0')
 
                 ypred = model(data)
                 pred = torch.argmax(ypred, dim=-1)
-                #print(pred)
                 metric.update(pred, torch.tensor(label), patch_name)
-
-                    #print(ypred.shape)
-                    #print(data.y)
-                    #label = torch.cat([d.y for d in data]).numpy()
-                    #label = data.y.cpu().numpy()
-                #labels.append(label)
-                #finaleval.batch_patch_result(patch_name, torch.max(ypred, 1)[1].cpu().numpy())
-                #_, indices = torch.max(ypred, 1)
-                #preds.append(ypred.detach().cpu().numpy())
-
-                #if max_num_examples is not None:
-                #    if (batch_idx+1)*args.batch_size > max_num_examples:
-                #        break
-
-                #if args.visualization and (batch_idx+1)*args.batch_size<50:
-                #    # visualization only support in "not args.load_data_list == True and args.full_test_graph"
-                #    adj = adj.detach().cpu().numpy()
-                #    h0 = h0.detach().cpu().numpy()
-                #    h0 = h0[:, :,-2:]
-                #    batch_size = h0.shape[0]
-                #    name = dataset.dataset.idxlist[int(batch_idx * batch_size) : int((batch_idx+1) * batch_size)]
-                #    assign_matrix_list = [f.detach().cpu().numpy() for f in model.assign_matrix]
-
-                #    for i in range(adj.shape[0]):
-                #        save_name = os.path.join(args.resultdir,gen_prefix(args),'visual', name[i].split('/')[-1] + '.gexf')
-                #        assign_matrix_list_single_image = [f[i] for f in assign_matrix_list]
-                #        output_to_gexf( h0[i], adj[i], assign_matrix_list_single_image, save_name)
-
-            #labels = np.concatenate(labels,0)
-            #preds = np.concatenate(preds,0)
-            #pred_n_times.append(preds[...,np.newaxis])
-            #labels_n_time.append(labels[...,np.newaxis])
-
-        #pred_n_times = np.concatenate(pred_n_times, -1)
-        #labels_n_time = np.hstack(labels_n_time)
-        #pred_n_times = np.mean(pred_n_times,-1)
-        #labels_n_time = np.mean(labels_n_time,-1)
-        #pred_n_times = np.argmax(pred_n_times,1)
 
     patch_acc = metric.patch_accuracy()
     image_acc_three = metric.image_acc_three_class()
@@ -131,9 +62,6 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
     #result = {'patch_acc': metrics.accuracy_score(labels_n_time,pred_n_times), 'img_acc':multi_class_acc, 'binary_acc': binary_acc }
     result = {'patch_acc': patch_acc, 'img_acc':image_acc_three, 'binary_acc':  image_acc_bin}
     return result
-    #multi_class_acc,binary_acc = finaleval.final_result()
-    #result = {'patch_acc': metrics.accuracy_score(labels_n_time,pred_n_times), 'img_acc':multi_class_acc, 'binary_acc': binary_acc }
-    #return result
 
 def gen_prefix(args):
 
@@ -210,6 +138,18 @@ def eval_idx(total_iters, num_evals):
 
     return intervals
 
+def max_grad(model):
+    res = 0
+    max_name = ''
+    for name, p in model.named_parameters():
+        cur_max = p.grad.max()
+        if res < cur_max:
+            res = cur_max
+            max_name = name
+
+    print(name, res)
+    return res
+
 def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=None, checkpoint = None):
     print('train data loader type', type(dataset))
     print('val data loader type', type(val_dataset))
@@ -218,72 +158,38 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
     #device = 'cuda:1' if torch.cuda.device_count()>1 else 'cuda:0'
     start_epoch = 0
     optimizer = init_optim(args.optim, model.parameters(), args.lr, args.weight_decay)
+    #print(optimizer)
+    #sys.exit()
     if checkpoint is not None:
         optimizer.load_state_dict(checkpoint['optimizer'])
         start_epoch = checkpoint['epoch']
 
     if args.step_size > 0:
         scheduler = lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
-    #cudnn.benchmark = True
-    #val_result={
-    #        'epoch': 0,
-    #        'loss': 0,
-    #        'img_acc': 0,
-    #        'patch_acc': 0 }
-    #best_val_result = {
-    #        'epoch': 0,
-    #        'loss': 0,
-    #        'img_acc': 0,
-    #        'patch_acc': 0 }
-    #test_result = {
-    #        'epoch': 0,
-    #        'loss': 0,
-    #        'img_acc': 0,
-    #        'patch_acc':0}
-    ##best_val_accs = []
-    #best_val_epochs = []
-    #test_accs = []
-    #test_epochs = []
-    #val_accs = []
+
     save_path = os.path.join(args.resultdir, gen_prefix(args), TIME_NOW)
-    #num_eval = args.num_eval
-    #iter_num = len(dataset) // num_eval
-    #idxes = eval_idx(len(dataset), args.num_eval)
-    #print(idxes)
-
-    #import sys
-    #sys.exit()
-    #print(model)
-    #import sys
-    #sys.exit()
-    #print()
-    #tensor = torch.Tensor(1, 3, 16)
-
-    #write_network = True
     best_val_result = {'patch_acc': 0, 'img_acc': 0, 'binary_acc': 0}
 
 
     eval_idxes = eval_idx(len(dataset), args.num_eval)
-    #print(eval_idxes)
     if args.visualization:
         eval_count = 0
     for epoch in range(start_epoch, args.num_epochs):
         epoch_start = time.time()
-        #torch.cuda.empty_cache()
-        #total_time = 0
-        #avg_loss = 0.0
         model.train()
         if args.name == 'fuse':
             dataset.dataset.set_epoch(epoch)
 
         for batch_idx, data in enumerate(dataset):
             if not args.load_data_list:
-                data = data.cuda()
+                #data = data.cuda()
+                data.to('cuda:0')
 
             _, loss = model(data)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            max_grad(model)
 
             print('Training Loss:{:0.6f}, Epoch: {epoch}, Batch: [{batch_idx}/{total}] LR:{:0.6f}'.format(
                 loss.item(),
@@ -299,17 +205,13 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                 visualize_scalar(writer, 'Train/loss', loss.item(), n_iter)
                 visualize_scalar(writer, 'Train/lr', optimizer.param_groups[0]['lr'], n_iter)
 
-            #print(eval_idxes)
             if batch_idx in eval_idxes:
                 eval_start = time.time()
                 print('Evaluating at {}th iterations.......'.format(batch_idx))
-                #print(eval_idxes)
                 val_result = evaluate(val_dataset, model, args, name='Validation')
-                #val_accs.append(val_result['patch_acc'])
-                if val_result['img_acc'] > best_val_result['img_acc'] - 1e-7:
+                if val_result['img_acc'] > best_val_result['img_acc']:
                     best_val_result['img_acc'] =  val_result['img_acc']
-                    #best_val_result['epoch'] = epoch
-                    #is_best = True
+
                     print('Saving best weight file to {}'.format(save_path))
                     save_checkpoint({'epoch': epoch + 1,
                                      'state_dict': model.state_dict() if torch.cuda.device_count() < 2 else model.module.state_dict(),
@@ -317,13 +219,13 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                                      'val_acc': val_result},
                                     os.path.join(save_path, 'model_best.pth.tar'))
 
-                if val_result['patch_acc'] > best_val_result['patch_acc'] - 1e-7:
+                if val_result['patch_acc'] > best_val_result['patch_acc']:
                     best_val_result['patch_acc'] = val_result['patch_acc']
 
-                if val_result['binary_acc'] > best_val_result['binary_acc'] - 1e-7:
+                if val_result['binary_acc'] > best_val_result['binary_acc']:
                     best_val_result['binary_acc'] = val_result['binary_acc']
-                #model.train()
-                print(('Epoch: {}, eval time consumed: {:0.4f}s, val patch acc: {:0.6f}, val image acc: {:0.6f}, val binary acc: {:0.6f}, '
+
+                print(('poch: {}, eval time consumed: {:0.4f}s, val patch acc: {:0.6f}, val image acc: {:0.6f}, val binary acc: {:0.6f}, '
                         'best val patch acc: {:0.6f}, best val image acc: {:0.6f}, best val binary acc: {:0.6f}').format(
                         epoch,
                         time.time() - eval_start,
@@ -334,7 +236,6 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                         best_val_result['img_acc'],
                         best_val_result['binary_acc'],
                     ))
-                #print('Best result is: {:0.4f}', )
                 print()
                 if args.visualization:
                     eval_count += 1
@@ -394,11 +295,11 @@ def cell_graph(args, writer = None):
                                               )
 
     #print(model)
-    if args.cross_val == 1:
-        model_path = '/home/baiyu/HGIN/output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_nameavg_adj0.4_ECRC_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs35_lr0.001_networkHGTIN_gamma0.1/Wednesday_28_July_2021_20h_49m_55s/model_best.pth.tar'
-        print('loading file from {}'.format(model_path))
-        model.load_state_dict(torch.load(model_path)['state_dict'])
-        print('done')
+    #if args.cross_val == 1:
+    #    model_path = '/home/baiyu/HGIN/output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_nameavg_adj0.4_ECRC_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs35_lr0.001_networkHGTIN_gamma0.1/Wednesday_28_July_2021_20h_49m_55s/model_best.pth.tar'
+    #    print('loading file from {}'.format(model_path))
+    #    model.load_state_dict(torch.load(model_path)['state_dict'])
+    #    print('done')
 
     #tensor = torch.Tensor(3, 10, 16)
     if(args.resume):
