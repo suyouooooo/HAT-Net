@@ -75,9 +75,9 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
                 label = torch.cat([d.y for d in data]).numpy()
             else:
                 patch_name = [dataset.dataset.idxlist[patch_idx.item()] for patch_idx in data.patch_idx]
-                #data.to('cuda:0')
                 label = data.y.cpu().numpy()
                 data = data.cuda()
+                #data.to('cuda:0')
                         #label = torch.cat([d.y for d in data]).numpy()
 
                 ypred = model(data)
@@ -215,7 +215,7 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
     print('val data loader type', type(val_dataset))
     print('model type', type(model))
     print("==> Start training")
-    #device = 'cuda:1' if torch.cuda.device_count()>1 else 'cuda:0'
+    device = 'cuda:1' if torch.cuda.device_count()>1 else 'cuda:0'
     start_epoch = 0
     optimizer = init_optim(args.optim, model.parameters(), args.lr, args.weight_decay)
     if checkpoint is not None:
@@ -278,7 +278,7 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
 
         for batch_idx, data in enumerate(dataset):
             if not args.load_data_list:
-                data = data.cuda()
+                data = data.to(device)
 
             _, loss = model(data)
             optimizer.zero_grad()
@@ -394,11 +394,11 @@ def cell_graph(args, writer = None):
                                               )
 
     #print(model)
-    if args.cross_val == 1:
-        model_path = '/home/baiyu/HGIN/output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_nameavg_adj0.4_ECRC_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs35_lr0.001_networkHGTIN_gamma0.1/Wednesday_28_July_2021_20h_49m_55s/model_best.pth.tar'
-        print('loading file from {}'.format(model_path))
-        model.load_state_dict(torch.load(model_path)['state_dict'])
-        print('done')
+    #if args.cross_val == 1:
+    #    model_path = '/home/baiyu/HGIN/output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_nameavg_adj0.4_ECRC_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs35_lr0.001_networkHGTIN_gamma0.1/Wednesday_28_July_2021_20h_49m_55s/model_best.pth.tar'
+    #    print('loading file from {}'.format(model_path))
+    #    model.load_state_dict(torch.load(model_path)['state_dict'])
+    #    print('done')
 
     #tensor = torch.Tensor(3, 10, 16)
     if(args.resume):
