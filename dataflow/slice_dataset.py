@@ -81,7 +81,16 @@ def save_patches(image_patches, save_path, src_image_name, grade_id, printable=F
         #if count == 1:
             #import sys;sys.exit()
 
+def slice_prostate(image_path, save_path, unit_size):
+    search_path = os.path.join(image_path, '**', '*.jpg')
+    for img_fp in glob.iglob(search_path, recursive=True):
+        print(img_fp)
+
+
 if __name__ == '__main__':
+    image_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_prostate_tcga/data/images/'
+    save_path = ''
+    unit_size = 310
     #path = '/data/smb/数据集/结直肠/病理学/Extended_CRC/train/Grade2_Patient_007_029810_066073.png'
     src_path = '/data/smb/数据集/结直肠/病理学/Extended_CRC/Original_Images/'
     #src_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/raw/CRC/fold_1/'
@@ -112,17 +121,6 @@ if __name__ == '__main__':
         #patches = crop_image(image, 224)
         patches = slice_image(image, 224)
         image_name = os.path.basename(i)
-        #print(i)
-        #if 'fold_1' in i:
-        #    fold_id = 1
-        #elif 'fold_2' in i:
-        #    fold_id = 2
-        #elif 'fold_3' in i:
-        #    fold_id = 3
-        #else:
-        #    raise ValueError('wrong folder id')
-
-        #print(fold_id)
         fold_id = split_info[image_name]
         #fold_id
         #if ''

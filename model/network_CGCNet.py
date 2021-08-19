@@ -267,7 +267,7 @@ class SoftPoolingGcnEncoder(nn.Module):
         embed_feature = self.GCN_embed_1(x, adj, embedding_mask)
         if self.jk:
             embed_feature = self.jk1(embed_feature)
-        out, _ = torch.max(embed_feature, dim = 1)
+        out, _ = torch.max(embed_feature, dim = 1) # torch.Size([30, 20])
         out_all.append(out)
 
         # GCN_pool_1是GraphSage
@@ -291,10 +291,12 @@ class SoftPoolingGcnEncoder(nn.Module):
         embed_feature = self.GCN_embed_3(x, adj, None)
         if self.jk:
             embed_feature = self.jk3(embed_feature)
+
         out, _ = torch.max(embed_feature, dim=1)
         out_all.append(out)
         output = torch.cat(out_all, 1)
         output = self.pred_model(output)
+
         if self.training:
             cls_loss = F.cross_entropy(output, label, size_average=True)
             return output, cls_loss

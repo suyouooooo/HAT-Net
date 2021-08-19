@@ -847,10 +847,6 @@ class FeatLMDBWriter:
 
 if __name__ == '__main__':
 
-    #save_path = ''
-    #dataset = ImageJson('/home/baiyu/Extended_CRC', '/home/baiyu/EXtended_CRC_Mask', 1792)
-    #image_path = '/home/baiyu/Extended_CRC'
-    #json_path = '/home/baiyu/EXtended_CRC_Mask'
     config = Res50JsonMaskConfig()
     dataset = config.dataset
     prefixes = dataset.image_prefixes()
@@ -916,49 +912,4 @@ if __name__ == '__main__':
             lmdb_pair.append([rel_path.encode(), val])
         lmdb_writer.add_pair(lmdb_pair)
 
-        #assert test_cum == sum(num_feats)
-
-        #if node_features:
-        #    node_features = np.vstack(node_features)
-        #else:
-        #    node_features = np.array(node_features)
-
-        #if node_coords:
-        #    node_coords = np.vstack(node_coords)
-        #else:
-        #    node_coords = np.array(node_coords)
-
-        #assert len(node_coords) == len(node_features)
-        #print(node_coords.shape, node_features.shape)
-        #print(type(node_coords), type(node_features))
-
-        #print(type(val))
-
-        #print(rel_path)
-
         print(count / (time.time() - start))
-
-
-            #print(image.shape, len(bboxes), bboxes[0], len(coords), coords[0], mask)
-            #for box, coord in zip(bboxes, coords):
-                #image = cv2.circle(image, tuple(coord), 3, (0, 200, 0), cv2.FILLED, 3)
-                #image = cv2.rectangle(image, tuple(box[:2]), tuple(box[2:]), (255, 0, 0), thickness=3)
-
-            #image = cv2.resize(image, (0, 0), fx=0.25, fy=0.25)
-            #cv2.imwrite('test.png', image)
-            #sys.exit()
-
-    #def image_lists_by_prefix(self, prefix):
-    #    return self.image_dataset.file_grids[prefix].flatten()
-
-    #def get_res_by_image_path(self, image_path):
-    #config = Res50JsonMaskConfig()
-    #gen_training_data(config)
-    #print(len(dataset))
-    #image, rel_image_path, bboxes, coords = random.choice(dataset)
-    #for image, rel_image_path, bboxes, coords, mask in dataset
-
-
-    #for coord in coords:
-
-    #cv2.imwrite('heihei_del.png', image)

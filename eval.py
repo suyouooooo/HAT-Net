@@ -14,6 +14,7 @@ import time
 from common.utils import mkdirs, save_checkpoint, load_checkpoint, init_optim, output_to_gexf, Metric
 from torch.optim import lr_scheduler
 from model import network_GIN_Hierarchical
+from model.network_GIN_baiyu import HatNet
 from torch_geometric.nn import DataParallel
 from dataflow.data import prepare_train_val_loader
 from setting import CrossValidSetting as DataSetting
@@ -52,7 +53,7 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
             # test 5 times, each time the graph is constructed by the same method from that in train
             preds = []
             labels = []
-            dataset.dataset.set_val_epoch(_)
+            #dataset.dataset.set_val_epoch(_)
 
             for batch_idx, data in enumerate(dataset):
                 #print(len(dataset), batch_idx)
@@ -81,7 +82,7 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
                         #label = torch.cat([d.y for d in data]).numpy()
 
                 #print(data)
-                ypred = model(data)
+                ypred, _, _ = model(data.x, data.edge_index, data.batch)
                 #print(patch_name)
                 #print(ypred.shape)
                 #pred = ypred
@@ -347,6 +348,12 @@ def cell_graph(args, writer = None):
     input_dim = args.input_feature_dim
     if args.task == 'CRC':
         args.num_classes = 3
+    elif args.task == 'ECRC':
+        args.num_classes = 3
+    elif args.task == 'TCGA':
+        args.num_classes = 2
+    else:
+        raise ValueError('wrong task name')
     # model = atten_network.SpGAT(18,args.hidden_dim,3, args.drop_out, args.assign_ratio,3)
     model = network_GIN_Hierarchical.SoftPoolingGcnEncoder(setting.max_num_nodes,
         input_dim, args.hidden_dim, args.output_dim, True, True, args.hidden_dim,  args.num_classes,
@@ -362,6 +369,7 @@ def cell_graph(args, writer = None):
                                           stage=args.stage
                                           )
 
+    model = HatNet(514, 64, args.num_classes)
     model.load_state_dict(torch.load(args.weight_file)['state_dict'])
     #tensor = torch.Tensor(3, 10, 16)
     #if(args.resume):

@@ -122,12 +122,10 @@ heihei_del.png
 heihei_del1.png
 heihei_del11.png
 res_add
-<<<<<<< HEAD
 Extended_CRC_Graph/
 ecrc_res
 ecrc_res1
 teaaaa.py
-=======
 1792x2_pool64
 *.png
 ecrc_20epoch
@@ -145,4 +143,15 @@ run1.py
 std
 t.py
 tttttt
->>>>>>> 291271772faf61621a40471bcd3db2c151010037
+test_no_overlap
+test_no_test
+*.jpg
+dd
+dd1
+dd2
+gen_512dim
+balance_del_lr0.001
+batch_size1024
+batch_size128
+crops
+aa.py

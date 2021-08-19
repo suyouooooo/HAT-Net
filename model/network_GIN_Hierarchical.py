@@ -13,8 +13,6 @@ from torch.nn import Linear, LSTM
 EPS = 1e-15
 import pdb
 
-
-
 class DenseJK(nn.Module):
     def __init__(self, mode, channels=None, num_layers=None):
         super(DenseJK, self).__init__()

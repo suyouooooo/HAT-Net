@@ -15,11 +15,14 @@ import time
 from common.utils import mkdirs, save_checkpoint, load_checkpoint, init_optim, output_to_gexf, Metric
 from torch.optim import lr_scheduler
 from model import network_GIN_Hierarchical, network_CGCNet
+from model.network_GIN_baiyu import HatNet
 from torch_geometric.nn import DataParallel
 from dataflow.data import prepare_train_val_loader
 from setting import CrossValidSetting as DataSetting
 import torch.utils.checkpoint as cp
 # os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+#from torch_geometric.utils import sprse_to_dense, dense_to_sparse
+import torch_geometric
 
 from datetime import datetime
 from common.utils import (
@@ -35,11 +38,12 @@ DATE_FORMAT = '%A_%d_%B_%Y_%Hh_%Mm_%Ss'
 TIME_NOW = datetime.now().strftime(DATE_FORMAT)
 
 def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
-    metric = Metric()
+    metric = Metric(num_classes=args.num_classes)
     model.eval()
     torch.cuda.empty_cache()
     with torch.no_grad():
         for batch_idx, data in enumerate(dataset):
+            start = time.time()
 
             if args.load_data_list:
                 patch_name = [dataset.dataset.idxlist[d.patch_idx.item()] for d in data]
@@ -47,20 +51,29 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
             else:
                 patch_name = [dataset.dataset.idxlist[patch_idx.item()] for patch_idx in data.patch_idx]
                 label = data.y.cpu().numpy()
+                #print(data)
                 #data = data.cuda()
                 data.to('cuda:0')
 
-                ypred = model(data)
+                ypred, _, _ = model(data.x, data.edge_index, data.batch)
+                #ypred = model(data)
                 pred = torch.argmax(ypred, dim=-1)
                 metric.update(pred, torch.tensor(label), patch_name)
+            #print('hello??', time.time() - start)
 
+    #print('here>>>')
+    start_cal = time.time()
     patch_acc = metric.patch_accuracy()
     image_acc_three = metric.image_acc_three_class()
     image_acc_bin = metric.image_acc_binary_class()
+    kappa = metric.kappa()
+    auc = metric.auc()
+    #print('hhhhh>>>', time.time() - start_cal)
 
     #multi_class_acc,binary_acc = finaleval.final_result()
     #result = {'patch_acc': metrics.accuracy_score(labels_n_time,pred_n_times), 'img_acc':multi_class_acc, 'binary_acc': binary_acc }
-    result = {'patch_acc': patch_acc, 'img_acc':image_acc_three, 'binary_acc':  image_acc_bin}
+    result = {'patch_acc': patch_acc, 'img_acc':image_acc_three, 'binary_acc':  image_acc_bin, 'kappa': kappa, 'auc': auc}
+    #print(metric.kappa, 'kappa value....................')
     return result
 
 def gen_prefix(args):
@@ -158,6 +171,7 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
     device = 'cuda:1' if torch.cuda.device_count()>1 else 'cuda:0'
     start_epoch = 0
     optimizer = init_optim(args.optim, model.parameters(), args.lr, args.weight_decay)
+    print(optimizer)
     #print(optimizer)
     #sys.exit()
     if checkpoint is not None:
@@ -168,7 +182,7 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
         scheduler = lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
 
     save_path = os.path.join(args.resultdir, gen_prefix(args), TIME_NOW)
-    best_val_result = {'patch_acc': 0, 'img_acc': 0, 'binary_acc': 0}
+    best_val_result = {'patch_acc': 0, 'img_acc': 0, 'binary_acc': 0, 'kappa': 0, 'auc': 0}
 
 
     eval_idxes = eval_idx(len(dataset), args.num_eval)
@@ -181,11 +195,16 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
             dataset.dataset.set_epoch(epoch)
 
         for batch_idx, data in enumerate(dataset):
+            #pppp = time.time()
             if not args.load_data_list:
                 #data = data.cuda()
                 data.to('cuda:0')
 
-            _, loss = model(data)
+            #_, loss = model(data)
+
+            ypred, mc_loss, o_loss = model(data.x, data.edge_index, data.batch)
+            loss = F.cross_entropy(ypred, data.y, size_average=True) + mc_loss + o_loss
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -205,6 +224,8 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                 visualize_scalar(writer, 'Train/loss', loss.item(), n_iter)
                 visualize_scalar(writer, 'Train/lr', optimizer.param_groups[0]['lr'], n_iter)
 
+
+            #print('heihei', time.time() - pppp)
             if batch_idx in eval_idxes:
                 eval_start = time.time()
                 print('Evaluating at {}th iterations.......'.format(batch_idx))
@@ -225,16 +246,28 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                 if val_result['binary_acc'] > best_val_result['binary_acc']:
                     best_val_result['binary_acc'] = val_result['binary_acc']
 
-                print(('poch: {}, eval time consumed: {:0.4f}s, val patch acc: {:0.6f}, val image acc: {:0.6f}, val binary acc: {:0.6f}, '
-                        'best val patch acc: {:0.6f}, best val image acc: {:0.6f}, best val binary acc: {:0.6f}').format(
+                if val_result['kappa'] > best_val_result['kappa']:
+                    best_val_result['kappa'] = val_result['kappa']
+
+                if val_result['auc'] > best_val_result['auc']:
+                    best_val_result['auc'] = val_result['auc']
+
+
+                print(('epoch: {}, eval time consumed: {:0.4f}s, val patch acc: {:0.6f}, val image acc: {:0.6f}, val binary acc: {:0.6f}, '
+                       'val kappa: {:0.6f}, val auc: {:0.6f}, best val patch acc: {:0.6f}, best val image acc: {:0.6f}, best val binary acc: {:0.6f}, '
+                       'best val kappa: {:0.6f}, best auc: {:0.6f}').format(
                         epoch,
                         time.time() - eval_start,
                         val_result['patch_acc'],
                         val_result['img_acc'],
                         val_result['binary_acc'],
+                        val_result['kappa'],
+                        val_result['auc'],
                         best_val_result['patch_acc'],
                         best_val_result['img_acc'],
                         best_val_result['binary_acc'],
+                        best_val_result['kappa'],
+                        best_val_result['auc']
                     ))
                 print()
                 if args.visualization:
@@ -242,8 +275,14 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                     visualize_scalar(writer, 'Val/patch_acc', val_result['patch_acc'],  eval_count)
                     visualize_scalar(writer, 'Val/image_acc', val_result['img_acc'],  eval_count)
                     visualize_scalar(writer, 'Val/binary_acc', val_result['binary_acc'],  eval_count)
+                    visualize_scalar(writer, 'Val/kappa', val_result['kappa'],  eval_count)
 
                 model.train()
+
+        #print('training set acc:')
+        #val_result = evaluate(dataset, model, args, name='Validation')
+        #print(val_result)
+
 
         if args.step_size > 0:
             scheduler.step()
@@ -263,25 +302,29 @@ def cell_graph(args, writer = None):
         args.num_classes = 3
     elif args.task == 'ECRC':
         args.num_classes = 3
+    elif args.task == 'TCGA':
+        args.num_classes = 2
     else:
         raise ValueError('wrong task name')
     # model = atten_network.SpGAT(18,args.hidden_dim,3, args.drop_out, args.assign_ratio,3)
     if args.network == 'HGTIN':
-        model = network_GIN_Hierarchical.SoftPoolingGcnEncoder(setting.max_num_nodes,
-            input_dim, args.hidden_dim, args.output_dim, True, True, args.hidden_dim,  args.num_classes,
-                                              args.assign_ratio,[50], concat= True,
-                                              gcn_name= args.gcn_name,collect_assign=args.visualization,
-                                              #load_data_sparse=(args.load_data_list and not args.visualization),
-                                              #load_data_sparse=args.load_data_sparse,
-                                              #load_data_sparse=(not args.load_data_list),
-                                              load_data_sparse=True,
-                                              norm_adj=args.norm_adj, activation=args.activation, drop_out=args.drop_out,
-                                              jk=args.jump_knowledge,
-                                              depth=args.depth,
-                                              stage=args.stage,
-                                              jk_tec=args.jk_tec,
-                                              pool_tec=args.pool_tec
-                                              )
+        #model = HatNet(512, 128, args.num_classes)
+        model = HatNet(514, 64, args.num_classes)
+        #model = network_GIN_Hierarchical.SoftPoolingGcnEncoder(setting.max_num_nodes,
+        #    input_dim, args.hidden_dim, args.output_dim, True, True, args.hidden_dim,  args.num_classes,
+        #                                      args.assign_ratio,[50], concat= True,
+        #                                      gcn_name= args.gcn_name,collect_assign=args.visualization,
+        #                                      #load_data_sparse=(args.load_data_list and not args.visualization),
+        #                                      #load_data_sparse=args.load_data_sparse,
+        #                                      #load_data_sparse=(not args.load_data_list),
+        #                                      load_data_sparse=True,
+        #                                      norm_adj=args.norm_adj, activation=args.activation, drop_out=args.drop_out,
+        #                                      jk=args.jump_knowledge,
+        #                                      depth=args.depth,
+        #                                      stage=args.stage,
+        #                                      jk_tec=args.jk_tec,
+        #                                      pool_tec=args.pool_tec
+        #                                      )
     elif args.network == 'CGC':
         model = network_CGCNet.SoftPoolingGcnEncoder(setting.max_num_nodes,
                                               input_dim, args.hidden_dim, args.output_dim, True, True, args.hidden_dim,
