@@ -305,6 +305,7 @@ class Metric:
         self.normal_class_id = normal_class_id
         self.image_prefix = dict()
         self.image_label = dict()
+        self.image_scores = dict()
         self.num_classes = num_classes
         #self.patch_acc = 0
         #self.image_acc_mul = 0
@@ -318,28 +319,31 @@ class Metric:
         self.total_images = [0] * num_classes # grade 1 grade 2 grade 3
         self.correct_images = [0] * num_classes
 
+        self.softmax = torch.nn.Softmax(dim=-1)
         #self.preds = []
         #self.gts = []
 
     def update(self, preds, labels, pathes):
-        #if not self.image_prefix:
+
+        scores = self.softmax(preds).tolist()
+        preds = torch.argmax(preds, dim=-1)
+
         self.correct_patches += preds.cpu().eq(labels.cpu()).sum().item()
         self.total_patches += len(labels)
 
         preds = preds.tolist()
         labels = labels.tolist()
-        #
-        for pred, label, path in zip(preds, labels, pathes):
+
+        for pred, label, path, score in zip(preds, labels, pathes, scores):
             prefix = path.split('.')[0]
             image_label = int(path.split('_grade_')[1][0]) - 1
             # label is patch level label
             # image_label is image level label
             #print(prefix)
             if prefix not in self.image_prefix:
-                #self.image_prefix[prefix] = [0, 0, 0]
                 self.image_prefix[prefix] = [0] * self.num_classes
-                #print(self.num_classes)
                 self.image_label[prefix] = image_label
+                self.image_scores[prefix] = score[label]
                 assert label == image_label
                 assert label < self.num_classes
                 assert pred < self.num_classes
@@ -374,27 +378,32 @@ class Metric:
             correct += pred == label
             total += 1
 
-            #if label == 0:
-            #    if pred == label:
-            #        grade1_correct += 1
-            #    #else:
-            #        #print('grade 1 failed', key)
-            #    grade1 += 1
+            if label == 0:
+                if pred == label:
+                    grade1_correct += 1
+                #else:
+                    #print('grade 1 failed', key)
+                    #tt = key.split('_grade_')[0]
+                    #print(key, 1111)
+                    #print(os.system(
+                    #        'cat /data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Labels/5Crops.csv | grep {}'.format(tt)
+                    #))
+                grade1 += 1
 
-            #elif label == 1:
-            #    if pred == label:
-            #        grade2_correct += 1
-            #    #else:
-            #        tt = key.split('_grade_')[0]
-            #        print(key, 1111)
-            #        print(os.system(
-            #                'cat /data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Labels/5Crops.csv | grep {}'.format(tt)
-            #        ))
-            #    #else:
-            #        #print('grade 2 failed', key)
-            #    grade2 += 1
-            #else:
-            #    raise ValueError('ffffff')
+            elif label == 1:
+                if pred == label:
+                    grade2_correct += 1
+                #else:
+                    #tt = key.split('_grade_')[0]
+                    #print(key, 1111)
+                    #print(os.system(
+                    #        'cat /data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Labels/5Crops.csv | grep {}'.format(tt)
+                    #))
+                #else:
+                    #print('grade 2 failed', key)
+                grade2 += 1
+            else:
+                raise ValueError('ffffff')
 
         #print(grade2_correct / grade2,  grade1_correct / grade1)
         #print(correct / total)
@@ -405,10 +414,10 @@ class Metric:
     def auc(self):
         preds = []
         gts = []
-        for key, value in self.image_prefix.items():
-            pred = value.index(max(value))
+        #for key, value in self.image_prefix.items(): ###########
+        for key, value in self.image_scores.items():
             label = self.image_label[key]
-            preds.append(pred)
+            preds.append(value)
             gts.append(label)
 
         fpr, tpr, thresholds = metrics.roc_curve(gts, preds)
