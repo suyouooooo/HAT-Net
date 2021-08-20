@@ -7,10 +7,48 @@ import torch_geometric
 
 
 
+def compute_mean(pathes):
+    count = 0
+    sums = 0
+    for path in pathes:
+        data = torch.load(path)
+        count += data.x.shape[0]
+        #sums += torch.sum(data.x, dim=0)
+
+        data = torch.cat([data.x, data.pos], dim=1)
+        sums += torch.sum(data, dim=0)
+
+    return sums / count
+
+def compute_std(pathes, mean=None):
+    if mean is None:
+        mean = compute_mean(pathes)
+
+    count = 0
+    sums = 0
+    for path in pathes:
+        data = torch.load(path)
+
+        count += data.x.shape[0]
+        data = torch.cat([data.x, data.pos], dim=1)
+        diff = data - mean
+        square = torch.square(diff)
+        sums += torch.sum(square, dim=0)
+
+    return sums / count
 
 #path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_fuse_cia_knn'
 #path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_add_cia_knn'
-path = '/home/baiyu/Extended_CRC_Graph/proto/fix_avg_cia_knn/'
+#path = '/home/baiyu/Extended_CRC_Graph/proto/fix_avg_cia_knn/'
+#path = '/data/hdd1/by/TCGA_Prostate/Feat_Test/0'
+#path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph_Aug/0/proto/fix_full_cia_knn/'
+path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops'
+pathes = glob.glob(os.path.join(path, '**', '*.pt'), recursive=True)
+
+mean = compute_mean(pathes)
+print(mean)
+std = compute_std(pathes, mean)
+print(std)
 
 #sub_folder = ['fold_1', 'fold_2', 'fold_3']
 #mean = {
@@ -24,24 +62,12 @@ path = '/home/baiyu/Extended_CRC_Graph/proto/fix_avg_cia_knn/'
 #    1:torch.tensor([0.0] * 18),
 #    2:torch.tensor([0.0] * 18)
 #}
-#count_1 = 0
-#count_2 = 0
-#count_3 = 0
-#sum1 = 0
-#sum2 = 0
-#sum3 = 0
-def compute_mean(pt_files):
-    count = 0
-    sums = 0
-    for pt_file in pt_files:
-        data = torch.load(pt_file)
-        #x = data['feat']
-        count += data.x.shape[0]
-        sums += torch.sum(data.x, dim=0)
-
-    return sums / count
-
-
+##count_1 = 0
+##count_2 = 0
+##count_3 = 0
+##sum1 = 0
+##sum2 = 0
+##sum3 = 0
 #for epoch in os.listdir(path):
 #    for s_idx, s in enumerate(sub_folder):
 #        for i in  glob.iglob(os.path.join(path, epoch, s, '*')):
@@ -49,8 +75,8 @@ def compute_mean(pt_files):
 #
 #            count[s_idx] += data.x.shape[0]
 #            sums[s_idx] += torch.sum(data.x, dim=0)
-#
-#
+##
+##
 #mean[0] = sums[0] / count[0]
 #mean[1] = sums[1] / count[1]
 #mean[2] = sums[2] / count[2]
@@ -71,30 +97,7 @@ def compute_mean(pt_files):
 #    1:torch.tensor([0.0] * 18),
 #    2:torch.tensor([0.0] * 18)
 #}
-
-def compute_std(pt_fps, mean):
-    sums = 0
-    count = 0
-    for fp in pt_fps:
-        data = torch.load(fp)
-        diff = data.x - mean
-        square = torch.square(diff)
-        sums += torch.sum(square, dim=0)
-        count += data.x.shape[0]
-
-    return torch.sqrt(sums / count)
-
-path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph_Aug/0/proto/fix_full_cia_knn'
-import glob
-
-
-fps = glob.glob(os.path.join(path, '**', '*.pt'), recursive=True)
-mean = compute_mean(fps)
-std = compute_std(fps, mean)
-
-print(mean)
-print(std)
-
+#
 #for epoch in os.listdir(path):
 #    for s_idx, s in enumerate(sub_folder):
 #        for i in  glob.iglob(os.path.join(path, epoch, s, '*')):

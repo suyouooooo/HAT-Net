@@ -440,6 +440,8 @@ class JsonDataset(BaseDataset):
                     #node['centroid'][0] /= 2
                     #node['centroid'][1] /= 2
                     #print(node['centroid'])
+
+                    # unit_size = 224 * 2
                     node['centroid'][0] += c_idx * 224 * 2
                     node['centroid'][1] += r_idx * 224 * 2
                     #node['bbox'][0][0]
@@ -453,6 +455,7 @@ class JsonDataset(BaseDataset):
                     #node['contour'][:, 0] += r_idx * 224 * 2
                     #node['contour'][:, 1] += c_idx * 224 * 2
                     #print(node['contour'])
+                    # contour: (x,y)
                     node['contour'] = [[c1 + c_idx * 224 * 2, c2 + r_idx * 224 * 2] for [c1, c2] in node['contour']]
                     #print(node['contour'])
 

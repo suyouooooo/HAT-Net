@@ -56,13 +56,7 @@ def add_pool(cluster, data):
     return data
 
 def read_data(dataset, raw_fp):
-    prefixes = dataset.file_prefixes
-    for prefix in prefixes:
-        if prefix in raw_fp:
-            break
-    res = dataset.whole_file(prefix)
-
-    #res = dataset.get_file_by_path(raw_fp)
+    res = dataset.get_file_by_path(raw_fp)
     feats = res['feat']
     coords = res['coord']
 
@@ -84,7 +78,7 @@ def read_data(dataset, raw_fp):
 
     return data
 
-def gen(raw_path, dataset, max_neighbours, epoch, sample_method, save_path):
+def gen(raw_path, dataset, max_neighbours, epoch, sample_method):
     # important: to select sample method, change sample_method in both main function and def gen
     #max_neighbours = 8
     #epoch = 1
@@ -92,8 +86,8 @@ def gen(raw_path, dataset, max_neighbours, epoch, sample_method, save_path):
     #mask = 'cia'
     ##sample_method= 'fuse'
     #sample_method= 'avg'
-    #setting = CrossValidSetting()
-    processed_dir = os.path.join(save_path, 'proto',
+    setting = CrossValidSetting()
+    processed_dir = os.path.join(setting.root, 'proto',
                                  'fix_%s_%s_%s' % (sample_method, 'cia', 'knn'))
 
      # Read data from `raw_path`
@@ -107,12 +101,12 @@ def gen(raw_path, dataset, max_neighbours, epoch, sample_method, save_path):
     num_sample = num_nodes
     for i in range(epoch):
        subdata = copy.deepcopy(data)
-       clusters = grid_cluster(subdata.pos, torch.Tensor([64 * 2, 64 * 2]))
+       clusters = grid_cluster(subdata.pos, torch.Tensor([64, 64]))
        subdata = avg_pool(clusters, subdata)
 
        # generate the graph
        #if graph_sampler == 'knn':
-       edge_index = radius_graph(subdata.pos, 200, None, True, max_neighbours)
+       edge_index = radius_graph(subdata.pos, 100, None, True, max_neighbours)
        #else:
        #    edge_index = random_sample_graph2(choice, distance, 100, True,
                                      #n_sample=8,sparse=True)
@@ -136,7 +130,7 @@ def gen(raw_path, dataset, max_neighbours, epoch, sample_method, save_path):
 
 if __name__ == '__main__':
     # important: to select sample method, change sample_method in both main function and def gen
-    #setting = CrossValidSetting()
+    setting = CrossValidSetting()
     folds = ['fold_1', 'fold_2', 'fold_3']
     #sample_method = 'fuse'
     sample_method = 'avg'
@@ -144,9 +138,9 @@ if __name__ == '__main__':
     graph_sampler = 'knn'
     epoch = 1
     #sampler = FarthestSampler()
-    #print(setting.root)
-    save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/FullSize_64/'
-    processed_dir = os.path.join(save_path, 'proto',
+    print(setting.root)
+
+    processed_dir = os.path.join(setting.root, 'proto',
                                       'fix_%s_%s_%s' % (sample_method, mask, graph_sampler))
 
     for f in folds:
@@ -156,20 +150,10 @@ if __name__ == '__main__':
             mkdirs(osp.join(processed_dir, '%d' % j, f))
 
     # print("original_files : " + str(original_files))
-    #lmdb_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_lmdb/extended_crc/feat/'
-    lmdb_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat/'
+    lmdb_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_lmdb/extended_crc/feat/'
     #lmdb_folder = LMDBFolder('/data/smb/syh/PycharmProjects/CGC-Net/data_lmdb/extended_crc/feat/')
     lmdb_folder = LMDBFolder(lmdb_path)
-    #lmdb_dataset = LMDBDataset(lmdb_folder, 224 * 16)
-    #file_path_lists = lmdb_dataset.file_path_lists
-
-    #file_prefixes = lmdb_dataset.file_prefixes
-    #file_path_lists = []
-    #for prefix in file_prefixes:
-    #    file_path_lists.append(lmdb_dataset.prefix2image_name(prefix))
-    #gen = partial(gen, dataset=lmdb_dataset, max_neighbours=8, sample_method='avg', epoch=1, save_path=save_path)
-
-    lmdb_dataset = LMDBDataset(lmdb_folder, 224)
+    lmdb_dataset = LMDBDataset(lmdb_folder, 224 * 16)
     file_path_lists = lmdb_dataset.file_path_lists
     gen = partial(gen, dataset=lmdb_dataset, max_neighbours=8, sample_method='avg', epoch=1)
     for file_path in file_path_lists:

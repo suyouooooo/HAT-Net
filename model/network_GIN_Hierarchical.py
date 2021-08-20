@@ -13,8 +13,6 @@ from torch.nn import Linear, LSTM
 EPS = 1e-15
 import pdb
 
-
-
 class DenseJK(nn.Module):
     def __init__(self, mode, channels=None, num_layers=None):
         super(DenseJK, self).__init__()
@@ -228,15 +226,11 @@ class SoftPoolingGcnEncoder(nn.Module):
                                                     label_dim, activation)
 
         #self.mlp = nn.Sequential(
-        #    nn.Linear(pred_input , pred_input, bias=False), # pred_input 60
+        #    nn.Linear(pred_input , pred_input), # pred_input 60
         #    nn.ReLU(),
-        #    nn.Linear(pred_input, pred_input // 2, bias=False),
+        #    nn.Linear(pred_input, pred_input // 2),
         #    nn.ReLU(),
-        #    nn.Linear(pred_input // 2, label_dim, bias=False)
-
-        #print(self.mlp)
-        #print()
-        #print(self.pred_model)
+        #    nn.Linear(pred_input // 2, label_dim))
 
     @staticmethod
     def construct_mask( max_nodes, batch_num_nodes):

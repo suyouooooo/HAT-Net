@@ -1,31 +1,23 @@
 #!/bin/bash
 #export CUDA_VISIBLE_DEVICES=1 && python train_HGP_GCN.py --batch_size 10
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=0
 export CUDA_HOME=$CUDA_HOME:/home/syh/cuda-11.0
 export PATH=$PATH:/home/syh/cuda-11.0/bin
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/syh/cuda-11.0/lib64
-export CUDA_VISIBLE_DEVICES=3
-#export CUDA_HOME=$CUDA_HOME:/home/syh/cuda-11.0
-#export PATH=$PATH:/home/syh/cuda-11.0/bin
-#export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/syh/cuda-11.0/lib64
 
-source /home/suyihan/anaconda3/bin/activate
+source /home/syh/anaconda3/bin/activate
 #which conda
-conda activate CGC-Net_by
+#conda activate CGC-Net_by
 
+conda activate CGC-Net2-tensorboard
 which python
-#python dataflow/prepare_cv_dataset_no_random_excrc.py
-python dataflow/prepare_cv_dataset_no_random_prostate.py
-#python /home/baiyu/HGIN/dataflow/extract_node_features.py
-#conda activate CGC-Net2-tensorboard
 #cd /data/by/tmp/HGIN
 
 #python /data/by/tmp/HGIN/dataflow/extract_node_features.py
-#python /home/baiyu/HGIN/dataflow/extract_node_features.py
+#python dataflow/prepare_cv_dataset_no_random_excrc.py
+python /data/by/tmp/HGIN/dataflow/construct_feature_graph_cnn.py
 #python /data/by/tmp/HGIN/dataflow/prepare_cv_dataset_no_random.py
 #python /data/by/tmp/HGIN/HGIN/common/utils.py
-#python  /data/by/tmp/HGIN/dataflow/prepare_cv_dataset_no_random.py
-#python /data/by/tmp/HGIN/dataflow/prepare_cv_dataset_test.py
 #python  dataflow/construct_training_data.py
 #python  /home/baiyu/HGIN/dataflow/file_dataloader.py
 
