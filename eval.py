@@ -64,15 +64,8 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
                     patch_name = [dataset.dataset.idxlist[patch_idx.item()] for patch_idx in data.patch_idx]
                     data.to('cuda:0')
                     label = data.y.cpu().numpy()
-                        #label = torch.cat([d.y for d in data]).numpy()
 
-                #print(data)
-                ypred, _, _ = model(data.x, data.edge_index, data.batch)
-                #print(patch_name)
-                #print(ypred.shape)
-                #pred = ypred
-                #pred = torch.argmax(ypred, dim=-1)
-                #print(pred)
+                ypred, _, = model(x)
                 metric.update(ypred, torch.tensor(label), patch_name)
 
     patch_acc = metric.patch_accuracy()
@@ -99,19 +92,19 @@ def cell_graph(args, writer = None):
     else:
         raise ValueError('wrong task name')
     # model = atten_network.SpGAT(18,args.hidden_dim,3, args.drop_out, args.assign_ratio,3)
-    model = network_GIN_Hierarchical.SoftPoolingGcnEncoder(setting.max_num_nodes,
-        input_dim, args.hidden_dim, args.output_dim, True, True, args.hidden_dim,  args.num_classes,
-                                          args.assign_ratio,[50], concat= True,
-                                          gcn_name= args.gcn_name,collect_assign=args.visualization,
-                                          #load_data_sparse=(args.load_data_list and not args.visualization),
-                                          #load_data_sparse=args.load_data_sparse,
-                                          #load_data_sparse=(not args.load_data_list),
-                                          load_data_sparse=True,
-                                          norm_adj=args.norm_adj, activation=args.activation, drop_out=args.drop_out,
-                                          jk=args.jump_knowledge,
-                                          depth=args.depth,
-                                          stage=args.stage
-                                          )
+    #model = network_GIN_Hierarchical.SoftPoolingGcnEncoder(setting.max_num_nodes,
+    #    input_dim, args.hidden_dim, args.output_dim, True, True, args.hidden_dim,  args.num_classes,
+    #                                      args.assign_ratio,[50], concat= True,
+    #                                      gcn_name= args.gcn_name,collect_assign=args.visualization,
+    #                                      #load_data_sparse=(args.load_data_list and not args.visualization),
+    #                                      #load_data_sparse=args.load_data_sparse,
+    #                                      #load_data_sparse=(not args.load_data_list),
+    #                                      load_data_sparse=True,
+    #                                      norm_adj=args.norm_adj, activation=args.activation, drop_out=args.drop_out,
+    #                                      jk=args.jump_knowledge,
+    #                                      depth=args.depth,
+    #                                      stage=args.stage
+    #                                      )
 
     model = HatNet(514, 64, args.num_classes)
     model.load_state_dict(torch.load(args.weight_file)['state_dict'])
@@ -131,18 +124,6 @@ def cell_graph(args, writer = None):
 
     val_result = evaluate(val_loader, model, args, name='Validation')
     print(val_result)
-
-    #print(type(model))
-    #if not args.skip_train:
-    #    # 如果不跳过训练，就执行下面的操作
-    #    if args.resume:
-    #        _, val_accs = train(train_loader, model, args, val_dataset=val_loader, test_dataset=None,
-    #        writer=writer, checkpoint = checkpoint)
-    ##    else:
-    #        _, val_accs = train(train_loader, model, args, val_dataset=val_loader, test_dataset=None,
-    #        writer=writer, )
-    #    print('finally: max_val_acc:%f'%max(val_accs))
-    #_ = evaluate(test_loader, model, args, name='Validation', max_num_examples=None)
 
 def arg_parse():
     data_setting = DataSetting()
@@ -281,16 +262,7 @@ def main():
     prog_args = arg_parse()
     #torch.backends.cudnn.benchmark = True
     print(prog_args)
-    #print(gen_prefix(prog_args))
-    #import sys
-    #sys.exit()
     writer = None
-    #if prog_args.visualization:
-    #    tb_logdir = os.path.join(settings.log_dir, gen_prefix(prog_args), TIME_NOW)
-    #    mkdirs([tb_logdir])
-    #    writer = SummaryWriter(log_dir=tb_logdir)
-    #if os.path.exists()
-    #tb_logdir = os.path.join()
     cell_graph(prog_args, writer=writer)
 
 if __name__ == "__main__":

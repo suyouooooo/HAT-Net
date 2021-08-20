@@ -17,6 +17,7 @@ from torch.optim import lr_scheduler
 from model import network_GIN_Hierarchical, network_CGCNet
 from model.network_GIN_baiyu import HatNet
 from torch_geometric.nn import DataParallel
+from torch_geometric.utils import dropout_adj
 from dataflow.data import prepare_train_val_loader
 from setting import CrossValidSetting as DataSetting
 import torch.utils.checkpoint as cp
@@ -34,7 +35,7 @@ from common.utils import (
 
 
 DATE_FORMAT = '%A_%d_%B_%Y_%Hh_%Mm_%Ss'
-#time of we run the script
+#time of us run the script
 TIME_NOW = datetime.now().strftime(DATE_FORMAT)
 
 def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
@@ -51,29 +52,20 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
             else:
                 patch_name = [dataset.dataset.idxlist[patch_idx.item()] for patch_idx in data.patch_idx]
                 label = data.y.cpu().numpy()
-                #print(data)
                 #data = data.cuda()
                 data.to('cuda:0')
 
-                ypred, _, _ = model(data.x, data.edge_index, data.batch)
-                #ypred = model(data)
-                pred = torch.argmax(ypred, dim=-1)
-                metric.update(pred, torch.tensor(label), patch_name)
-            #print('hello??', time.time() - start)
+                ypred, _ = model(data)
+                metric.update(ypred, torch.tensor(label), patch_name)
 
-    #print('here>>>')
     start_cal = time.time()
     patch_acc = metric.patch_accuracy()
     image_acc_three = metric.image_acc_three_class()
     image_acc_bin = metric.image_acc_binary_class()
     kappa = metric.kappa()
     auc = metric.auc()
-    #print('hhhhh>>>', time.time() - start_cal)
 
-    #multi_class_acc,binary_acc = finaleval.final_result()
-    #result = {'patch_acc': metrics.accuracy_score(labels_n_time,pred_n_times), 'img_acc':multi_class_acc, 'binary_acc': binary_acc }
     result = {'patch_acc': patch_acc, 'img_acc':image_acc_three, 'binary_acc':  image_acc_bin, 'kappa': kappa, 'auc': auc}
-    #print(metric.kappa, 'kappa value....................')
     return result
 
 def gen_prefix(args):
@@ -172,8 +164,6 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
     start_epoch = 0
     optimizer = init_optim(args.optim, model.parameters(), args.lr, args.weight_decay)
     print(optimizer)
-    #print(optimizer)
-    #sys.exit()
     if checkpoint is not None:
         optimizer.load_state_dict(checkpoint['optimizer'])
         start_epoch = checkpoint['epoch']
@@ -200,15 +190,15 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                 #data = data.cuda()
                 data.to('cuda:0')
 
-            #_, loss = model(data)
+            edge_index, _ = dropout_adj(data.edge_index, p=0.02, force_undirected=True)
+            data.edge_index = edge_index
 
-            ypred, mc_loss, o_loss = model(data.x, data.edge_index, data.batch)
-            loss = F.cross_entropy(ypred, data.y, size_average=True) + mc_loss + o_loss
+            _, loss = model(data)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            max_grad(model)
+            #max_grad(model)
 
             print('Training Loss:{:0.6f}, Epoch: {epoch}, Batch: [{batch_idx}/{total}] LR:{:0.6f}'.format(
                 loss.item(),
