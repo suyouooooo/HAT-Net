@@ -191,8 +191,8 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                 #data = data.cuda()
                 data.to('cuda:0')
 
-            edge_index, _ = dropout_adj(data.edge_index, p=0.02, force_undirected=True)
-            data.edge_index = edge_index
+            #edge_index, _ = dropout_adj(data.edge_index, p=0.02, force_undirected=True)
+            #data.edge_index = edge_index
 
             _, loss = model(data)
 
