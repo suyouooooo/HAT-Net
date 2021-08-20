@@ -500,6 +500,30 @@ def sparse_to_dense(edge_index, edge_attr=None, num_nodes=None):
     adj = torch.sparse_coo_tensor(edge_index, edge_attr, torch.Size([N, N]))
     return adj.to_dense()
 
+class EarlyStopping:
+    def __init__(self, patient, metric):
+        if metric == 'acc':
+            self.acc = 0
+        else:
+            raise ValueError('wrong metric')
+
+        self.counter = 0
+        self.patient = patient
+        self.metric = metric
+
+
+    def update(self, val):
+        self.counter += 1
+        if self.metric == 'acc':
+            if val > self.acc:
+                self.acc = val
+                self.counter = 0
+
+            if self.counter > self.patient:
+                print('early stopping.... ')
+                import sys; sys.exit()
+
+
 
 if __name__ == '__main__':
     # pt_to_gexf('/data/hdd1/syh/PycharmProjects/CGC-Net/data/proto/coordinate/CRC/fold_4/2_low_grade/Patient_001_02_Low-Grade.npy','/data/hdd1/syh/PycharmProjects/CGC-Net/data/proto/fix_fuse_hover_knn/0/fold_1/1_normal')

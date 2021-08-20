@@ -12,7 +12,7 @@ import argparse
 import os
 import json
 import time
-from common.utils import mkdirs, save_checkpoint, load_checkpoint, init_optim, output_to_gexf, Metric
+from common.utils import mkdirs, save_checkpoint, load_checkpoint, init_optim, output_to_gexf, Metric, EarlyStopping
 from torch.optim import lr_scheduler
 from model import network_GIN_Hierarchical, network_CGCNet
 from model.network_GIN_baiyu import HatNet
@@ -175,6 +175,7 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
     best_val_result = {'patch_acc': 0, 'img_acc': 0, 'binary_acc': 0, 'kappa': 0, 'auc': 0}
 
 
+    early_stop = EarlyStopping(patient=100 * args.num_eval, metric='acc')
     eval_idxes = eval_idx(len(dataset), args.num_eval)
     if args.visualization:
         eval_count = 0
@@ -268,6 +269,9 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                     visualize_scalar(writer, 'Val/kappa', val_result['kappa'],  eval_count)
 
                 model.train()
+
+                early_stop.update(val_result['img_acc'])
+
 
         #print('training set acc:')
         #val_result = evaluate(dataset, model, args, name='Validation')
