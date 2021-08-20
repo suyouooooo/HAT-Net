@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from torch_geometric.utils import sparse_to_dense
+#from torch_geometric.utils import sparse_to_dense
 # from torch_geometric.utils import to_dense_adj
 from torch_geometric.nn import radius_graph
 import networkx as nx
@@ -9,6 +9,8 @@ import torch
 import shutil
 from torch.nn import Parameter
 import matplotlib.pyplot as plt
+from sklearn.metrics import cohen_kappa_score
+
 
 
 
@@ -296,11 +298,13 @@ def compute_mean_and_std(dataset):
     std = (std_b.item() / 255.0, std_g.item() / 255.0, std_r.item() / 255.0)
     return mean, std
 
+
 class Metric:
-    def __init__(self, normal_class_id=0):
+    def __init__(self, normal_class_id=0, num_classes=3):
         self.normal_class_id = normal_class_id
         self.image_prefix = dict()
         self.image_label = dict()
+        self.num_classes = num_classes
         #self.patch_acc = 0
         #self.image_acc_mul = 0
         #self.image_acc_bin = 0
@@ -308,8 +312,14 @@ class Metric:
         self.total_patches = 0
         self.correct_patches = 0
 
-        self.total_images = [0, 0, 0] # grade 1 grade 2 grade 3
-        self.correct_images = [0, 0, 0]
+        #self.total_images = [0, 0, 0] # grade 1 grade 2 grade 3
+        #self.correct_images = [0, 0, 0]
+        self.total_images = [0] * num_classes # grade 1 grade 2 grade 3
+        self.correct_images = [0] * num_classes
+
+        self.preds = []
+        self.gts = []
+
 
     def update(self, preds, labels, pathes):
         #if not self.image_prefix:
@@ -320,15 +330,26 @@ class Metric:
         labels = labels.tolist()
         #
         for pred, label, path in zip(preds, labels, pathes):
-            prefix = path.split('_grade_')[0]
+            #prefix = path.split('_grade_')[0]
+            prefix = os.path.basename(path)
             image_label = int(path.split('_grade_')[1][0]) - 1
+            assert image_label >= 0
+            assert image_label <= 4
+            # label is patch level label
+            # image_label is image level label
             #print(prefix)
             if prefix not in self.image_prefix:
-                self.image_prefix[prefix] = [0, 0, 0]
+                #self.image_prefix[prefix] = [0, 0, 0]
+                self.image_prefix[prefix] = [0] * self.num_classes
                 self.image_label[prefix] = image_label
+
+            assert image_label == label
 
             # add to image stats
             self.image_prefix[prefix][pred] += 1
+            if max(self.image_prefix[prefix]) > 1:
+                print(max(self.image_prefix[prefix]), path, label, self.image_prefix)
+                raise Exception('image_prefix[prefix] should be less than 1')
 
     def patch_accuracy(self):
         return self.correct_patches / self.total_patches
@@ -337,6 +358,8 @@ class Metric:
 
         correct = 0
         total = 0
+        #res = []
+        print('image_acc_three....')
         for key, value in self.image_prefix.items():
             pred = value.index(max(value))
             label = self.image_label[key]
@@ -344,12 +367,26 @@ class Metric:
             correct += pred == label
             total += 1
 
+            #print(key, value, pred, label, pred == label)
+        #print(res)
+        print('done ....')
         return correct / total
+
+    def kappa(self):
+        for key, value in self.image_prefix.items():
+            pred = value.index(max(value))
+            label = self.image_label[key]
+            self.preds.append(pred)
+            self.gts.append(label)
+
+        print('kappa', len(self.preds), len(self.gts))
+        return cohen_kappa_score(self.gts, self.preds, weights='quadratic')
 
     def image_acc_binary_class(self):
         correct = 0
         total = 0
 
+        print('image_bin_three....')
         for key, value in self.image_prefix.items():
             pred = value.index(max(value))
             label = self.image_label[key]
@@ -361,10 +398,56 @@ class Metric:
                 if pred != self.normal_class_id:
                     correct += 1
 
+            #print(key, value, pred, label, pred == label)
             total  += 1
+        print('done ....')
 
         return correct / total
 
+
+import torch
+from torch_sparse import coalesce
+
+
+def maybe_num_nodes(index, num_nodes=None):
+        return index.max().item() + 1 if num_nodes is None else num_nodes
+
+
+def dense_to_sparse(tensor):
+    r"""Converts a dense adjacency matrix to a sparse adjacency matrix defined
+    by edge indices and edge attributes.
+
+    Args:
+        tensor (Tensor): The dense adjacency matrix.
+     :rtype: (:class:`LongTensor`, :class:`Tensor`)
+    """
+    print('dense_to_sparse.......')
+    assert tensor.dim() == 2
+    index = tensor.nonzero().t().contiguous()
+    value = tensor[index[0], index[1]]
+    return index, value
+
+
+def sparse_to_dense(edge_index, edge_attr=None, num_nodes=None):
+    r"""Converts a sparse adjacency matrix given by edge indices and edge
+    attributes to a dense adjacency matrix.
+
+    Args:
+        edge_index (LongTensor): The edge indices.
+        edge_attr (Tensor): Edge weights or multi-dimensional edge features.
+        num_nodes (int, optional): The number of nodes, *i.e.*
+        :obj:`max_val + 1` of :attr:`index`. (default: :obj:`None`)
+
+        :rtype: :class:`Tensor`
+        """
+    print('sparse to dense........')
+    N = maybe_num_nodes(edge_index, num_nodes)
+
+    if edge_attr is None:
+        edge_attr = torch.ones(edge_index.size(1), device=edge_index.device)
+
+    adj = torch.sparse_coo_tensor(edge_index, edge_attr, torch.Size([N, N]))
+    return adj.to_dense()
 
 
 if __name__ == '__main__':

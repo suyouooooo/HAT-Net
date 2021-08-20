@@ -122,12 +122,10 @@ heihei_del.png
 heihei_del1.png
 heihei_del11.png
 res_add
-<<<<<<< HEAD
 Extended_CRC_Graph/
 ecrc_res
 ecrc_res1
 teaaaa.py
-=======
 1792x2_pool64
 *.png
 ecrc_20epoch
@@ -145,4 +143,22 @@ run1.py
 std
 t.py
 tttttt
->>>>>>> 291271772faf61621a40471bcd3db2c151010037
+xxxx.jpg
+"test_if_stuck\342\200\224gpu3"
+test_if_stuck
+test.pkl
+test2
+test_if_stuck
+\"test_if_stuck\342\200\224gpu3\"
+train_test.py
+*.jpg
+ddd
+dim33
+gen_jitter
+*.npy
+*.pkl
+*.pt
+gen_lmdb_del
+a
+aaaa.py
+test_if_stuck—gpu3

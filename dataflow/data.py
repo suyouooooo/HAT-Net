@@ -1,17 +1,19 @@
 import os.path as osp
 import os
 import torch
+from torch.utils.data import SubsetRandomSampler
 from torch_geometric.data import Dataset
-from torch_geometric.data import Data, DataListLoader,DataLoader
+from torch_geometric.data import Data, DataListLoader, DataLoader
 from torch_geometric.nn import radius_graph
 import random
 import numpy as np
 from tqdm import tqdm
-from common.utils import FarthestSampler,filter_sampled_indice
-from torch_geometric.utils import sparse_to_dense, dense_to_sparse
+from common.utils import FarthestSampler,filter_sampled_indice, sparse_to_dense, dense_to_sparse
+#from torch_geometric.utils import sparse_to_dense, dense_to_sparse
 # from torch_geometric.utils import to_dense_adj, dense_to_sparse
 from setting import CrossValidSetting
 from .mean_std import MEAN_STD
+from datasets.prostate import TCGAProstate
 
 
 _CROSS_VAL = {1:{'train':['fold_1', 'fold_2'], 'valid': ['fold_3']},
@@ -130,7 +132,70 @@ _MEAN_CIA, _STD_CIA = MEAN_STD['res50_avg_cia_ecrc']
 #                2.4071e-02, 2.2154e-02, 2.1846e-02, 2.2499e-02, 2.1645e-02, 2.1047e-02,
 #                2.2892e-02, 2.3742e-02, 2.3778e-02, 2.0216e-02, 1.0348e+03, 1.0332e+03]}
 
+def get_tgca_dataset(args):
+    def split_train_test(image_file_path):
+        train_indices = []
+        test_indices = []
+        image_file_path = sorted(image_file_path, key=lambda x:os.path.basename(x))
+        for idx, fp in enumerate(image_file_path):
+            base_name = os.path.basename(fp)
+            if '_aug_0' in basename:
+                test_indices.append(idx)
+            else:
+                train_indices.append(idx)
+
+        random.Random(42).shuffle(test_indices)
+        random.Random(42).shuffle(train_indices)
+
+        return train_indices, test_indices
+
+
+    #train_set = TCGAProstate('/data/hdd1/by/TCGA_Prostate/Cell_Graph_Aug/9')
+
+    dataset = TCGAProstate('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops')
+    image_file_path = dataset.image_file_path()
+    train_indices, test_indices = split_train_test(image_file_path)
+
+    fold_num = 432
+    cv = args.cross_val
+    #random.Random(42).shuffle(test_indices)
+    test_indices = test_indices[fold_num * (cv - 1) : fold_num * cv]
+
+    #indices = list(range(len(dataset)))
+    #fold_num = 432
+    #random.Random(42).shuffle(indices)
+    #if args.cv == 1:
+
+    #cv = args.cross_val
+    #test_idx = indices[fold_num * (cv - 1) : fold_num * cv]
+    #print(len(test_idx))
+    test_sampler = SubsetRandomSampler(test_indices)
+
+    #train_idx = []
+    #for idx in indices:
+    #    if idx not in test_idx:
+    #        train_idx.append(idx)
+
+    #print(len(train_idx))
+    #sys.exit()
+    train_sampler = SubsetRandomSampler(train_indices)
+    train_set = DataLoader(dataset, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False, sampler=train_sampler)
+    test_set = DataLoader(dataset, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False, sampler=test_sampler)
+
+    #train_set = TCGAProstate('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph_Aug/0')
+    #train_set = []
+    ##print(args.num_workers, 'num_works')
+    #train_set = DataLoader(train_set, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=True)
+    #test_set = TCGAProstate('/data/hdd1/by/TCGA_Prostate/Cell_Graph_Test/0')
+    #test_set = DataLoader(test_set, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False)
+
+
+    return train_set, test_set, test_set
+
+
 def prepare_train_val_loader(args):
+    if args.task == 'TCGA':
+        return get_tgca_dataset(args)
 
     setting = CrossValidSetting()
     sampler_type = None
@@ -284,6 +349,9 @@ class NucleiDataset(Dataset):
     def processed_file_names(self):
         processed_file_names = self.idxlist
         return processed_file_names
+
+    def len(self):
+        return len(self)
 
     def __len__(self):
         return len(self.processed_file_names)
@@ -465,14 +533,17 @@ class NucleiDatasetBatchOutput(NucleiDataset):
                 if torch.is_tensor(item) and item.size(0) == num_nodes:
                     data[key] = item[choice]
         if self.graph_sampler == 'knn':
+            #print('???????')
             edge_index = radius_graph(data.pos, self.max_edge_distance, None, True, self.max_neighbours)
             """
             print("data.py len(edge_index) " + str(len(edge_index)))
             2
             """
+            #print('aaa', edge_index.shape, data.edge_index.shape)
             data.edge_index = edge_index
         else:
             raise NotImplementedError
         data.patch_idx = torch.tensor([idx])
         data.x = (data.x - self.mean) / self.std
+        #print(idx, '33333')
         return data
