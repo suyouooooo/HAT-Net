@@ -319,13 +319,10 @@ class Metric:
         self.total_images = [0] * num_classes # grade 1 grade 2 grade 3
         self.correct_images = [0] * num_classes
 
-        self.softmax = torch.nn.Softmax(dim=-1)
-        #self.preds = []
-        #self.gts = []
 
     def update(self, preds, labels, pathes):
 
-        scores = self.softmax(preds).tolist()
+        scores = torch.sigmoid(preds).tolist()
         preds = torch.argmax(preds, dim=-1)
 
         self.correct_patches += preds.cpu().eq(labels.cpu()).sum().item()
@@ -343,10 +340,15 @@ class Metric:
             if prefix not in self.image_prefix:
                 self.image_prefix[prefix] = [0] * self.num_classes
                 self.image_label[prefix] = image_label
-                self.image_scores[prefix] = score[label]
                 assert label == image_label
                 assert label < self.num_classes
                 assert pred < self.num_classes
+
+            if label == 0:
+                s = 1 - score[label]
+            else:
+                s = score[label]
+            self.image_scores[prefix] = s
 
             assert image_label == label
 
@@ -414,15 +416,12 @@ class Metric:
     def auc(self):
         preds = []
         gts = []
-        #for key, value in self.image_prefix.items(): ###########
         for key, value in self.image_scores.items():
             label = self.image_label[key]
             preds.append(value)
             gts.append(label)
 
-        fpr, tpr, thresholds = metrics.roc_curve(gts, preds)
-
-        return metrics.auc(fpr, tpr)
+        return metrics.roc_auc_score(gts, preds)
 
     def kappa(self):
         preds = []
@@ -451,7 +450,6 @@ class Metric:
                 if pred != self.normal_class_id:
                     correct += 1
 
-            #print(key, value, pred, label, pred == label)
             total  += 1
         print('done ....')
 
