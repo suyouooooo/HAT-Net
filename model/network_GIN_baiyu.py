@@ -16,9 +16,6 @@ class NN(nn.Module):
 
     def forward(self, x):
         x = self.fc1(x)
-        #if not self.channel_last:
-        #    print(x.shape, 111)
-        #    x = x.permute(0, 2, 1)
         if x.dim() == 3:
             x = x.permute(0, 2, 1)
 
@@ -30,9 +27,6 @@ class NN(nn.Module):
         x = self.relu(x)
         x = self.fc2(x)
         x = self.relu(x)
-
-        #if not self.channel_last:
-        #    x = x.permute(0, 2, 1)
 
         return  x
 
@@ -125,20 +119,19 @@ class HatNet(nn.Module):
         self.dropout = nn.Dropout()
         self.fc2 = nn.Linear(dim * 21 // 4, out_channels)
 
-    def forward(self, x, edge_index, batch):
-        #print(x.shape)
+    def forward(self, data):
+        x, edge_index, batch = data.x, data.edge_index, data.batch
+
         outputs = []
         x = self.conv1(x, edge_index)
         outputs.append(global_add_pool(x, batch))
         outputs.append(global_mean_pool(x, batch))
         outputs.append(global_max_pool(x, batch))
-        #print(x.shape)
 
         x = self.conv2(x, edge_index)
         outputs.append(global_add_pool(x, batch))
         outputs.append(global_mean_pool(x, batch))
         outputs.append(global_max_pool(x, batch))
-        #print(x.shape)
 
         x, mask = to_dense_batch(x, batch)
         adj = to_dense_adj(edge_index, batch)
@@ -147,50 +140,33 @@ class HatNet(nn.Module):
         outputs.append(torch.mean(x, dim=1))
         outputs.append(torch.sum(x, dim=1))
         outputs.append(torch.max(x, dim=1)[0])
-        #print(outputs[-1].shape)
-        #print(x.shape, 111, outputs[-1].shape)
 
-        #print(x.shape, 'x.shape')
-        #print(adj.shape, adj.dtype)
-        #x = x.permute(0, 2, 1)
         x = self.conv3(x, adj)
         outputs.append(torch.mean(x, dim=1))
         outputs.append(torch.sum(x, dim=1))
         outputs.append(torch.max(x, dim=1)[0])
-        #print(x.shape)
 
         x = self.conv4(x, adj)
         outputs.append(torch.mean(x, dim=1))
         outputs.append(torch.sum(x, dim=1))
         outputs.append(torch.max(x, dim=1)[0])
-        #print(x.shape)
-        #x = x.permute(0, 2, 1)
-        #print(x.shape)
 
         s = self.pool2(x)
         x, adj, mc2, o2 = dense_mincut_pool(x, adj, s)
-        #print(x.shape)
         outputs.append(torch.mean(x, dim=1))
         outputs.append(torch.sum(x, dim=1))
         outputs.append(torch.max(x, dim=1)[0])
-
 
         x = self.conv5(x, adj)
         outputs.append(torch.mean(x, dim=1))
         outputs.append(torch.sum(x, dim=1))
         outputs.append(torch.max(x, dim=1)[0])
-        #print(torch.cat(outputs, dim=1).shape)
-        #for i in outputs:
-        #    print(i.shape)
-        #print('1111111111111111111111111111111')
-        #x = x.mean(dim=1)
+
         x = torch.cat(outputs, dim=1)
-        #print(x.shape)
         x = self.fc1(x)
         x = self.dropout(x)
         x = self.fc2(x)
-        #print(x.shape)
-        #print(x, mc1 + mc2, o1 + o2)
-        #sys.exit()
-        #import sys; sys.exit()
-        return x, mc1 + mc2, o1 + o2
+        mc_loss = mc1 + mc2
+        o_loss = o1 + o2
+        loss = F.cross_entropy(x, data.y, size_average=True) + mc_loss + o_loss
+        return x, loss
