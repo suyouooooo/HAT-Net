@@ -245,11 +245,11 @@ def _get_batch_features_new(numpy_queue, info_queue, label):
                 #print(os.path.join(self.distance_save_path, name))
 
                 # 把特征表示和质心表示都存储起来
-                np.save(os.path.join(self.feature_save_path, name), node_feature.astype(np.float32))
-                np.save(os.path.join(self.distance_save_path, name), node_coordinate.astype(np.float32))
+                #np.save(os.path.join(self.feature_save_path, name), node_feature.astype(np.float32))
+                #np.save(os.path.join(self.distance_save_path, name), node_coordinate.astype(np.float32))
 
-                # 计算质心之间的euc_dist
-                euc_dist(os.path.join(self.distance_save_path, name))
+                ## 计算质心之间的euc_dist
+                #euc_dist(os.path.join(self.distance_save_path, name))
 
 
                 info_queue.put(name)

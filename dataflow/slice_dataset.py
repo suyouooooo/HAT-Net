@@ -98,7 +98,7 @@ if __name__ == '__main__':
     dest_path = 'test_can_be_del3'
     #cache_path = '/data/by/tmp/HGIN/cache'
 
-    csv_file = '/data/by/tmp/HGIN/dataflow/extended_crc_fold_info.csv'
+    csv_file = 'dataflow/extended_crc_fold_info.csv'
     split_info = read_csv(csv_file)
 
     #lmdb_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/raw/CRC_LMDB/fold_1'

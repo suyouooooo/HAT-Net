@@ -161,8 +161,8 @@ def gen(raw_path):
        #    if torch.is_tensor(item) and item.size(0) == num_nodes:
        #        subdata[key] = item[choice]
        clusters = grid_cluster(subdata.pos, torch.Tensor([64, 64]))
-       #subdata = avg_pool(clusters, subdata)
-       subdata = add_pool(clusters, subdata)
+       subdata = avg_pool(clusters, subdata)
+       #subdata = add_pool(clusters, subdata)
 
        # generate the graph
        if graph_sampler == 'knn':
@@ -209,7 +209,7 @@ if __name__ == '__main__':
     original_files = []
     sampling_ratio = 0.5
     #sample_method = 'fuse'
-    sample_method = 'add'
+    sample_method = 'avg'
     mask = 'cia'
     graph_sampler = 'knn'
     epoch = 1

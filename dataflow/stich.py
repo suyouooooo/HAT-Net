@@ -106,6 +106,7 @@ class BaseDataset:
         self.file_grids = self.construct_grids()
         self.image_size = image_size
         self.imagefp2coords = self.image_coords()
+
         assert image_size % 224 == 0
         self.border = int(image_size / 224)
         self.file_list = file_list
@@ -267,6 +268,7 @@ class BaseDataset:
 
         return file_prefix
 
+
     #abstrct
     def construct_grids(self):
         file_clusters = self.cluster_files
@@ -300,8 +302,14 @@ class BaseDataset:
 
         return file_clusters
 
+    def prefix2image_name(self, prefix):
+        "full size"
+        v = self.file_grids[prefix]
+        return v[0, 0]
+
     def whole_file(self, prefix):
         #for idx, (k, v) in enumerate(self.file_grids.items()):
+        prefix = str(prefix)
         v = self.file_grids[prefix]
         return self.stich_files(v)
 
