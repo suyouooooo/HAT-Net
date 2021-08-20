@@ -162,3 +162,15 @@ gen_lmdb_del
 a
 aaaa.py
 test_if_stuck—gpu3
+test_no_overlap
+test_no_test
+*.jpg
+dd
+dd1
+dd2
+gen_512dim
+balance_del_lr0.001
+batch_size1024
+batch_size128
+crops
+aa.py

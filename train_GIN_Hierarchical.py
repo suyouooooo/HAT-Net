@@ -67,11 +67,12 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
     image_acc_three = metric.image_acc_three_class()
     image_acc_bin = metric.image_acc_binary_class()
     kappa = metric.kappa()
+    auc = metric.auc()
     #print('hhhhh>>>', time.time() - start_cal)
 
     #multi_class_acc,binary_acc = finaleval.final_result()
     #result = {'patch_acc': metrics.accuracy_score(labels_n_time,pred_n_times), 'img_acc':multi_class_acc, 'binary_acc': binary_acc }
-    result = {'patch_acc': patch_acc, 'img_acc':image_acc_three, 'binary_acc':  image_acc_bin, 'kappa': kappa}
+    result = {'patch_acc': patch_acc, 'img_acc':image_acc_three, 'binary_acc':  image_acc_bin, 'kappa': kappa, 'auc': auc}
     #print(metric.kappa, 'kappa value....................')
     return result
 
@@ -181,7 +182,7 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
         scheduler = lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=args.gamma)
 
     save_path = os.path.join(args.resultdir, gen_prefix(args), TIME_NOW)
-    best_val_result = {'patch_acc': 0, 'img_acc': 0, 'binary_acc': 0, 'kappa': 0}
+    best_val_result = {'patch_acc': 0, 'img_acc': 0, 'binary_acc': 0, 'kappa': 0, 'auc': 0}
 
 
     eval_idxes = eval_idx(len(dataset), args.num_eval)
@@ -248,20 +249,25 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
                 if val_result['kappa'] > best_val_result['kappa']:
                     best_val_result['kappa'] = val_result['kappa']
 
+                if val_result['auc'] > best_val_result['auc']:
+                    best_val_result['auc'] = val_result['auc']
+
 
                 print(('epoch: {}, eval time consumed: {:0.4f}s, val patch acc: {:0.6f}, val image acc: {:0.6f}, val binary acc: {:0.6f}, '
-                       'val kappa: {:06f}, best val patch acc: {:0.6f}, best val image acc: {:0.6f}, best val binary acc: {:0.6f}, '
-                       'best val kappa: {:0.6f}').format(
+                       'val kappa: {:0.6f}, val auc: {:0.6f}, best val patch acc: {:0.6f}, best val image acc: {:0.6f}, best val binary acc: {:0.6f}, '
+                       'best val kappa: {:0.6f}, best auc: {:0.6f}').format(
                         epoch,
                         time.time() - eval_start,
                         val_result['patch_acc'],
                         val_result['img_acc'],
                         val_result['binary_acc'],
                         val_result['kappa'],
+                        val_result['auc'],
                         best_val_result['patch_acc'],
                         best_val_result['img_acc'],
                         best_val_result['binary_acc'],
                         best_val_result['kappa'],
+                        best_val_result['auc']
                     ))
                 print()
                 if args.visualization:

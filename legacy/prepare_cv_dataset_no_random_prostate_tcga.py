@@ -153,7 +153,7 @@ if __name__ == '__main__':
     lmdb_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_lmdb/extended_crc/feat/'
     #lmdb_folder = LMDBFolder('/data/smb/syh/PycharmProjects/CGC-Net/data_lmdb/extended_crc/feat/')
     lmdb_folder = LMDBFolder(lmdb_path)
-    lmdb_dataset = LMDBDataset(lmdb_folder, 224)
+    lmdb_dataset = LMDBDataset(lmdb_folder, 224 * 16)
     file_path_lists = lmdb_dataset.file_path_lists
     gen = partial(gen, dataset=lmdb_dataset, max_neighbours=8, sample_method='avg', epoch=1)
     for file_path in file_path_lists:

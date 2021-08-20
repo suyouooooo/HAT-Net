@@ -49,7 +49,8 @@ class DataSetting:
         self.root = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/raw'
         self.test_data_path = os.path.join(self.root, self.dataset, self.label)
         #self.save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_su/proto'
-        self.save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto'
+        #self.save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto'
+        self.save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/512dim/proto'
         self.do_eval = False
         self.test_image_list = os.listdir(self.test_data_path)
         self.test_image_list = [f for f in self.test_image_list if 'png' in f]
@@ -115,8 +116,6 @@ def _get_batch_features_new(numpy_queue, info_queue, label):
             #disp_to_img = np.array(Image.fromarray(binary_mask))
             node_feature = []
             node_coordinate = []
-            print(self.feature_save_path, name)
-            print(self.distance_save_path, name)
             count = 0
             imgs = []
             print(len(props))
@@ -145,7 +144,7 @@ def _get_batch_features_new(numpy_queue, info_queue, label):
                 coor = prop.centroid
                 node_coordinate.append(coor)
 
-                if count == 512:
+                if count == 3000:
                     batch = torch.stack(imgs)
                     batch = batch.cuda()
                     #print(batch.shape)
@@ -153,9 +152,9 @@ def _get_batch_features_new(numpy_queue, info_queue, label):
                         output = net(batch)
                         output = output.unsqueeze(0)
                         #print(output.shape)
-                        output = adaptive_avg_pool3d(output, (16, 1, 1))
+                        output = adaptive_avg_pool3d(output, (512, 1, 1))
                         output = output.squeeze()
-                        print(output.shape)
+                        print('output', output.shape)
                     node_feature.append(output.cpu().numpy())
                     count = 0
                     imgs = []
@@ -221,7 +220,7 @@ def _get_batch_features_new(numpy_queue, info_queue, label):
                     output = net(batch)
                     output = output.unsqueeze(0)
                     #print(output.shape)
-                    output = adaptive_avg_pool3d(output, (16, 1, 1))
+                    output = adaptive_avg_pool3d(output, (512, 1, 1))
                     output = output.squeeze()
                     print(output.shape)
                 node_feature.append(output.cpu().numpy())
@@ -235,6 +234,8 @@ def _get_batch_features_new(numpy_queue, info_queue, label):
                 node_coordinate = np.vstack(node_coordinate)
                 print(node_feature.shape)
                 print(node_coordinate.shape)
+                print('heihei', self.feature_save_path)
+                print('name', self.distance_save_path)
 
                 #print('lllllll')
                 #print(self.feature_save_path)
@@ -242,6 +243,7 @@ def _get_batch_features_new(numpy_queue, info_queue, label):
                 #print(name)
                 #print(os.path.join(self.feature_save_path, name))
                 #print(os.path.join(self.distance_save_path, name))
+
                 # 把特征表示和质心表示都存储起来
                 np.save(os.path.join(self.feature_save_path, name), node_feature.astype(np.float32))
                 np.save(os.path.join(self.distance_save_path, name), node_coordinate.astype(np.float32))
@@ -281,27 +283,34 @@ def build_feature(label):
     _get_batch_features_new(nameQueue, infoQueue, label)
 
 if __name__ == '__main__':
-    mean = (0.7862793912386359, 0.6027306811087783, 0.7336620786688793) #bgr
-    std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
+    #mean = (0.7862793912386359, 0.6027306811087783, 0.7336620786688793) #bgr  colon
+    #std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)     colon
+
+    mean = [0.73646324, 0.56556627, 0.70180897] # bgr  # multi organ
+    std = [0.18869222, 0.21968669, 0.17277594] # bgr
+
     valid_transforms = transforms.Compose([
         transforms.ToPILImage(),
         transforms.Resize((64, 64)),
         transforms.ToTensor(),
         transforms.Normalize(mean, std),
     ])
-    net = network('resnet50', 4, False)
+    #net = network('resnet50', 4, False)
+    net = network('resnet50', 5, False)
     #net.load_state_dict(torch.load('/data/by/tmp/HGIN/checkpoint/resnet50/Monday_31_May_2021_00h_40m_26s/17-best.pth'))
-    net.load_state_dict(torch.load('/data/by/tmp/HGIN/checkpoint/resnet50/Tuesday_01_June_2021_19h_43m_05s/191-best.pth'))
+    #net.load_state_dict(torch.load('/data/by/tmp/Tensorflow-practice/checkpoint/resnet50/Thursday_05_August_2021_08h_06m_29s'))
+    #
+    net.load_state_dict(torch.load('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ResNet50/97-best.pth')) # all organ
     net = net.cuda()
     labels = [
-        #'fold_1/1_normal',
-        #'fold_1/2_low_grade',
-        #'fold_1/3_high_grade',
-        #'fold_2/1_normal',
-        #'fold_2/2_low_grade',
-        #'fold_2/3_high_grade',
-        #'fold_3/1_normal',
-        #'fold_3/2_low_grade',
+        'fold_1/1_normal',
+        'fold_1/2_low_grade',
+        'fold_1/3_high_grade',
+        'fold_2/1_normal',
+        'fold_2/2_low_grade',
+        'fold_2/3_high_grade',
+        'fold_3/1_normal',
+        'fold_3/2_low_grade',
         'fold_3/3_high_grade',
     ]
 

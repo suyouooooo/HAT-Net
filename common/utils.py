@@ -10,6 +10,7 @@ import shutil
 from torch.nn import Parameter
 import matplotlib.pyplot as plt
 from sklearn.metrics import cohen_kappa_score
+from sklearn import metrics
 
 
 
@@ -317,9 +318,8 @@ class Metric:
         self.total_images = [0] * num_classes # grade 1 grade 2 grade 3
         self.correct_images = [0] * num_classes
 
-        self.preds = []
-        self.gts = []
-
+        #self.preds = []
+        #self.gts = []
 
     def update(self, preds, labels, pathes):
         #if not self.image_prefix:
@@ -330,18 +330,19 @@ class Metric:
         labels = labels.tolist()
         #
         for pred, label, path in zip(preds, labels, pathes):
-            #prefix = path.split('_grade_')[0]
-            prefix = os.path.basename(path)
+            prefix = path.split('.')[0]
             image_label = int(path.split('_grade_')[1][0]) - 1
-            assert image_label >= 0
-            assert image_label <= 4
             # label is patch level label
             # image_label is image level label
             #print(prefix)
             if prefix not in self.image_prefix:
                 #self.image_prefix[prefix] = [0, 0, 0]
                 self.image_prefix[prefix] = [0] * self.num_classes
+                #print(self.num_classes)
                 self.image_label[prefix] = image_label
+                assert label == image_label
+                assert label < self.num_classes
+                assert pred < self.num_classes
 
             assert image_label == label
 
@@ -350,11 +351,17 @@ class Metric:
             if max(self.image_prefix[prefix]) > 1:
                 print(max(self.image_prefix[prefix]), path, label, self.image_prefix)
                 raise Exception('image_prefix[prefix] should be less than 1')
+            assert sum(self.image_prefix[prefix]) <= 1
 
     def patch_accuracy(self):
         return self.correct_patches / self.total_patches
 
     def image_acc_three_class(self):
+
+        grade1 = 0
+        grade1_correct = 0
+        grade2 = 0
+        grade2_correct = 0
 
         correct = 0
         total = 0
@@ -367,20 +374,57 @@ class Metric:
             correct += pred == label
             total += 1
 
-            #print(key, value, pred, label, pred == label)
-        #print(res)
-        print('done ....')
+            #if label == 0:
+            #    if pred == label:
+            #        grade1_correct += 1
+            #    #else:
+            #        #print('grade 1 failed', key)
+            #    grade1 += 1
+
+            #elif label == 1:
+            #    if pred == label:
+            #        grade2_correct += 1
+            #    #else:
+            #        tt = key.split('_grade_')[0]
+            #        print(key, 1111)
+            #        print(os.system(
+            #                'cat /data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Labels/5Crops.csv | grep {}'.format(tt)
+            #        ))
+            #    #else:
+            #        #print('grade 2 failed', key)
+            #    grade2 += 1
+            #else:
+            #    raise ValueError('ffffff')
+
+        #print(grade2_correct / grade2,  grade1_correct / grade1)
+        #print(correct / total)
+        #print(grade2_correct, grade2,  grade1_correct, grade1)
+        #import sys; sys.exit()
         return correct / total
 
-    def kappa(self):
+    def auc(self):
+        preds = []
+        gts = []
         for key, value in self.image_prefix.items():
             pred = value.index(max(value))
             label = self.image_label[key]
-            self.preds.append(pred)
-            self.gts.append(label)
+            preds.append(pred)
+            gts.append(label)
 
-        print('kappa', len(self.preds), len(self.gts))
-        return cohen_kappa_score(self.gts, self.preds, weights='quadratic')
+        fpr, tpr, thresholds = metrics.roc_curve(gts, preds)
+
+        return metrics.auc(fpr, tpr)
+
+    def kappa(self):
+        preds = []
+        gts = []
+        for key, value in self.image_prefix.items():
+            pred = value.index(max(value))
+            label = self.image_label[key]
+            preds.append(pred)
+            gts.append(label)
+
+        return cohen_kappa_score(gts, preds, weights='quadratic')
 
     def image_acc_binary_class(self):
         correct = 0

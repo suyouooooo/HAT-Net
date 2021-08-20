@@ -37,11 +37,6 @@ def to_dense_adj(edge_index, batch=None, edge_attr=None):
 
     return adj
 
-
-import torch
-from torch_scatter import scatter_add
-
-
 def to_dense_batch(x, batch, fill_value=0):
     r"""Given a sparse batch of node features
     :math:`\mathbf{X} \in \mathbb{R}^{(N_1 + \ldots + N_B) \times F}` (with
