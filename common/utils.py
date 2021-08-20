@@ -1,6 +1,9 @@
 import os
 import numpy as np
 from torch_geometric.utils import sparse_to_dense
+import torch_geometric
+#print(torch_geometric.utils.__file__)
+#sys.exit()
 # from torch_geometric.utils import to_dense_adj
 from torch_geometric.nn import radius_graph
 import networkx as nx
@@ -297,10 +300,11 @@ def compute_mean_and_std(dataset):
     return mean, std
 
 class Metric:
-    def __init__(self, normal_class_id=0):
+    def __init__(self, normal_class_id=0, num_classes=5):
         self.normal_class_id = normal_class_id
         self.image_prefix = dict()
         self.image_label = dict()
+        self.num_classes = num_classes
         #self.patch_acc = 0
         #self.image_acc_mul = 0
         #self.image_acc_bin = 0
@@ -308,8 +312,8 @@ class Metric:
         self.total_patches = 0
         self.correct_patches = 0
 
-        self.total_images = [0, 0, 0] # grade 1 grade 2 grade 3
-        self.correct_images = [0, 0, 0]
+        self.total_images = [0] * self.num_classes # grade 1 grade 2 grade 3
+        self.correct_images = [0] * self.num_classes
 
     def update(self, preds, labels, pathes):
         #if not self.image_prefix:
@@ -320,11 +324,12 @@ class Metric:
         labels = labels.tolist()
         #
         for pred, label, path in zip(preds, labels, pathes):
-            prefix = path.split('_grade_')[0]
+            #prefix = path.split('_grade_')[0]
+            prefix = os.path.basename(path)
             image_label = int(path.split('_grade_')[1][0]) - 1
             #print(prefix)
             if prefix not in self.image_prefix:
-                self.image_prefix[prefix] = [0, 0, 0]
+                self.image_prefix[prefix] = [0] self.num_classes
                 self.image_label[prefix] = image_label
 
             # add to image stats

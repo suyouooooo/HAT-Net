@@ -9,7 +9,8 @@ class CrossValidSetting:
         self.sample_ratio = 1
         # processed
         #self.root = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning'#'/research/dept6/ynzhou/gcnn/data'
-        self.root = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/'#'/research/dept6/ynzhou/gcnn/data'
+        #self.root = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/'#'/research/dept6/ynzhou/gcnn/data'
+        self.root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/FullSize_64/'#'/research/dept6/ynzhou/gcnn/data'
         #self.root = '/home/baiyu/Extended_CRC_Graph1792x2'#'/research/dept6/ynzhou/gcnn/data'
         #self.root = '/data/smb/syh/PycharmProjects/CGC-Net/data_extended_crc/res50_1792x2_avg_knn/'#'/research/dept6/ynzhou/gcnn/data'
         self.save_path = 'output'

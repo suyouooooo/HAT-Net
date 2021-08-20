@@ -139,3 +139,15 @@ run1.py
 std
 t.py
 tttttt
+*.jpg
+aaa
+data_agumentation
+epoch20_ecrc
+extract_node_features.sh
+gen_prostate512dim
+gen_prostate512dm
+gen_prostate_graph
+json_test/
+tmp1/
+tmp2/
+train_linear_classifier.py

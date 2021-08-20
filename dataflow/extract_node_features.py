@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from functools import partial
 import sys
+import csv
 import random
 import pickle
 import glob
@@ -16,12 +17,12 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 from torch.nn.functional import adaptive_avg_pool3d
 from torchvision import transforms
-from torch_geometric.data import Data
-from torch_geometric.nn import radius_graph
-from torch_cluster import grid_cluster
-from torch_scatter import scatter
-from torch_geometric.nn.pool.consecutive import consecutive_cluster
-from torch_geometric.nn.pool.pool import pool_pos
+#from torch_geometric.data import Data
+#from torch_geometric.nn import radius_graph
+#from torch_cluster import grid_cluster
+#from torch_scatter import scatter
+#from torch_geometric.nn.pool.consecutive import consecutive_cluster
+#from torch_geometric.nn.pool.pool import pool_pos
 
 
 import cv2
@@ -80,11 +81,22 @@ class Patches:
         self.bboxes = bboxes
         self.patch_size = patch_size
         self.coords = coords
-        mean = (0.7862793912386359, 0.6027306811087783, 0.7336620786688793) #bgr
-        std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
+        #mean = (0.7862793912386359, 0.6027306811087783, 0.7336620786688793) #bgr
+        #std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
+        mean = [0.73646324, 0.56556627, 0.70180897] # Expanuke bgr
+        #self.std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
+        std = [0.18869222, 0.21968669, 0.17277594] # Expanuke bgr
+
+
         self.transforms = transforms.Compose([
             transforms.ToPILImage(),
-            transforms.Resize((self.patch_size, self.patch_size)),
+            transforms.RandomChoice([
+                transforms.RandomResizedCrop(patch_size, scale=(0.9, 1.1)),
+                transforms.Resize((patch_size, patch_size))
+            ]),
+            transforms.RandomApply(torch.nn.ModuleList([
+                    transforms.ColorJitter(0.2, 0.2, 0.2, 0.2)
+            ]), p=0.3),
             transforms.ToTensor(),
             transforms.Normalize(mean, std),
         ])
@@ -136,7 +148,7 @@ def network(network_name, num_classes, pretrained):
 #### generating features
 class ExtractorResNet50:
     def __init__(self, path):
-        self.net = network('resnet50',  4, False)
+        self.net = network('resnet50',  5, False)
         print('loading weight file {}...'.format(path))
         self.net.load_state_dict(torch.load(path))
         print('Done.')
@@ -145,10 +157,12 @@ class ExtractorResNet50:
     def __call__(self, images):
         with torch.no_grad():
             output = self.net(images.cuda())
-            output = output.unsqueeze(0)
-            output = adaptive_avg_pool3d(output, (16, 1, 1))
-            output = output.squeeze()
-        return output.cpu().numpy()
+            print(output.shape)
+            #output = output.unsqueeze(0)
+            #output = adaptive_avg_pool3d(output, (512, 1, 1))
+            #output = output.squeeze()
+        #return output.cpu().numpy()
+        return output.cpu()
 
 #def extractor_resnet(images, mask=None):
     #net = network('resnet50',  4, False)
@@ -748,7 +762,8 @@ class Res50BaseConfig:
         self.training_data_path = os.path.join('/home/baiyu/training_data/CRC', folder_name)
         self.return_mask = True
         #res50_path = '/home/baiyu/HGIN/checkpoint/191-best.pth'
-        res50_path = 'checkpoint/resnet50/Tuesday_01_June_2021_19h_43m_05s/191-best.pth'
+        #res50_path = 'checkpoint/resnet50/Tuesday_01_June_2021_19h_43m_05s/191-best.pth' # colon
+        res50_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ResNet50/97-best.pth'
 
         #mean = (0.7862793912386359, 0.6027306811087783, 0.7336620786688793) #bgr
         #std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
@@ -809,10 +824,24 @@ class Res50JsonMaskConfig(Res50BaseConfig):
         folder_name = 'fix_{}_{}_{}'.format(self.pool, self.seg, self.method)
         self.training_data_path = os.path.join('/home/baiyu/training_data/ExtendedCRC', folder_name)
         self.return_mask = False
-        self.dataset = ImageJson(self.image_path, self.label_path, self.image_size, self.return_mask)
+        #self.dataset = ImageJson(self.image_path, self.label_path, self.image_size, self.return_mask)
+        #self.dataset = ImageJson(self.image_path, self.label_path, self.image_size, self.return_mask)
         #self.reader = lmdb_concatenate(self.save_path, transform=transform)
         #self.writer = LMDBWriter(self.save_path)
         #self.reader = partial(LMDBReader.init_dataset, transform=transform)
+
+class TorchWriter:
+    def __init__(self, save_path):
+        self.save_path = save_path
+
+    def add_pair(self, pairs):
+        for pair in pairs:
+            name, val = pair
+            name = name.split('.')[0] + '.pt'
+            save_path = os.path.join(self.save_path, name)
+            #print(save_path)
+            torch.save(val, save_path)
+
 
 class FeatLMDBWriter:
     def __init__(self, save_path):
@@ -845,76 +874,390 @@ class FeatLMDBWriter:
     #                os.path.join(self.save_path, key)))
     #        txn.put(key.encode(), value)
 
+class ProsateTest:
+    def __init__(self, image_folder, json_folder, csv_file):
+        self.image2path = {}
+        self.json2path = {}
+        search_path = os.path.join(image_folder, '**', '*.jpg')
+        for image_fp in glob.iglob(search_path, recursive=True):
+            image_name = os.path.basename(image_fp)
+            self.image2path[image_name] = image_fp
+
+        search_path = os.path.join(json_folder, '**', '*.json')
+        for json_fp in glob.iglob(search_path, recursive=True):
+            json_name = os.path.basename(json_fp)
+            self.json2path[json_name] = json_fp
+
+        self.image_names = []
+        self.labels = []
+        with open(csv_file, newline='') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                self.image_names.append(row['image name'])
+                self.labels.append(int(row['gleason score']) - 5)
+
+
+        #self.image_names = list(self.image2path.keys())
+
+
+    def __len__(self):
+        return len(self.image_names)
+
+    def read_json(self, json_path):
+        #res = []
+        coords = []
+        bboxes = []
+
+        with open(json_path, 'r') as f:
+            json_data = json.load(f)
+            #print(res.keys())
+            #print(res['nuc']['2175'])
+            #print(len(res['nuc'].keys()))
+            for k, node in json_data['nuc'].items():
+                #print(type(v))
+                #print(v.keys())
+                cen = node['centroid']
+                cen = [int(c) for c in cen]
+                cen = cen[::-1]
+                coords.append(cen)
+                #image = cv2.circle(image, tuple(cen), 3, (0, 200, 0), cv2.FILLED, 1)
+                # node['bbox'] : [[rmin, cmin], [rmax, cmax]]
+                bbox = node['bbox']
+                # bbox : [min_y, min_x, max_y, max_x]
+                #bbox = [b // 2 for b in sum(bbox, [])]
+                bbox = [b for b in sum(bbox, [])]
+                bboxes.append(bbox)
+                #res.append(v)
+
+        return bboxes, coords
+
+
+    def __getitem__(self, idx):
+        image_name = self.image_names[idx]
+        image_fp = self.image2path[image_name]
+        image = cv2.imread(image_fp, -1)
+
+        json_fp = self.json2path[image_name.replace('.jpg', '.json')]
+        #print(image_fp, json_fp)
+        bboxes, coords = self.read_json(json_fp)
+        base_name = os.path.basename(image_fp)
+        label = self.labels[idx]
+        base_name = base_name.replace('.', '_grade_{}.'.format(label))
+
+        return base_name, image, bboxes, coords
+
+class Prosate:
+    def __init__(self, image_folder, json_folder):
+        self.image2path = {}
+        self.json2path = {}
+        search_path = os.path.join(image_folder, '**', '*.jpg')
+        for image_fp in glob.iglob(search_path, recursive=True):
+            image_name = os.path.basename(image_fp)
+            self.image2path[image_name] = image_fp
+
+        search_path = os.path.join(json_folder, '**', '*.json')
+        for json_fp in glob.iglob(search_path, recursive=True):
+            json_name = os.path.basename(json_fp)
+            self.json2path[json_name] = json_fp
+
+        self.image_names = list(self.image2path.keys())
+
+    def __len__(self):
+        return len(self.image2path.keys())
+
+    def read_json(self, json_path):
+        #res = []
+        coords = []
+        bboxes = []
+
+        with open(json_path, 'r') as f:
+            json_data = json.load(f)
+            #print(res.keys())
+            #print(res['nuc']['2175'])
+            #print(len(res['nuc'].keys()))
+            for k, node in json_data['nuc'].items():
+                #print(type(v))
+                #print(v.keys())
+                cen = node['centroid']
+                cen = [int(c) for c in cen]
+                cen = cen[::-1]
+                coords.append(cen)
+                #image = cv2.circle(image, tuple(cen), 3, (0, 200, 0), cv2.FILLED, 1)
+                # node['bbox'] : [[rmin, cmin], [rmax, cmax]]
+                bbox = node['bbox']
+                # bbox : [min_y, min_x, max_y, max_x]
+                #bbox = [b // 2 for b in sum(bbox, [])]
+                bbox = [b for b in sum(bbox, [])]
+                bboxes.append(bbox)
+                #res.append(v)
+
+        return bboxes, coords
+
+
+    def __getitem__(self, idx):
+        image_name = self.image_names[idx]
+        image_fp = self.image2path[image_name]
+        image = cv2.imread(image_fp, -1)
+
+        json_fp = self.json2path[image_name.replace('.jpg', '.json')]
+        #print(image_fp, json_fp)
+        bboxes, coords = self.read_json(json_fp)
+
+        return os.path.basename(image_fp), image, bboxes, coords
+
+def generate_features(dataloader, num_feats, rel_pathes, writer, extractor):
+    node_features = []
+    node_coords = []
+    #wih torch.no_grad():
+    torch.set_printoptions(sci_mode=False)
+
+    from collections import Counter
+    counter = Counter()
+    count = 0
+    total = 0
+    for images, coords in data_loader:
+        output = extractor(images)
+
+        ff = torch.nn.functional.softmax(output, dim=1)
+        ind = torch.argmax(ff, dim=1)
+        #print(ind, ff.max())
+        print(ind.shape)
+        cc = ff.max(dim=1)[0] > 0.5
+        total += len(ff)
+        count += cc.sum()
+        print(count / total)
+        #print(ind)
+        #for i in ind.tolist():
+        counter.update(ind.tolist())
+        print(counter)
+        print('---------------')
+        #print(ff, ff.max())
+
+        node_features.append(output)
+        node_coords.extend(coords)
+
+    sys.exit()
+    node_features = np.vstack(node_features)
+    node_coords = np.vstack(node_coords)
+    prev = 0
+    #print('here...........................................')
+    #print(len(rel_pathes), len(num_feats))
+    #test_cum = 0
+    lmdb_pair = []
+    for rel_path, num_feat in zip(rel_pathes, num_feats):
+        #print(rel_path, num_feat)
+
+        sub_feat = node_features[prev : prev+num_feat]
+        sub_coord = node_coords[prev : prev+num_feat]
+        #print(sub_feat.shape, sub_coord.shape)
+        val = {
+            'feat' : torch.tensor(sub_feat),
+            'coord' : torch.tensor(sub_coord)
+        }
+        #val = pickle.dumps(val)
+        rel_path = rel_path.replace('.jpg', '.npy')
+        #print(rel_path, sub_feat.shape, sub_coord.shape)
+        prev += num_feat
+        lmdb_pair.append([rel_path, val])
+
+    writer.add_pair(lmdb_pair)
+    #print(count / (time.time() - start))
+
+
+
 if __name__ == '__main__':
 
     #save_path = ''
     #dataset = ImageJson('/home/baiyu/Extended_CRC', '/home/baiyu/EXtended_CRC_Mask', 1792)
     #image_path = '/home/baiyu/Extended_CRC'
     #json_path = '/home/baiyu/EXtended_CRC_Mask'
-    config = Res50JsonMaskConfig()
-    dataset = config.dataset
-    prefixes = dataset.image_prefixes()
-    print(len(prefixes))
+    #config = Res50JsonMaskConfig()
+    resnet50_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ResNet50/97-best.pth'
+    image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images'
+    json_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json/'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat/'
+    #image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images_Aug/train'
+    #json_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json_Aug/train'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat_Aug/'
+    save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat_Test'
+    csv_file = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Labels/Gleason_masks_test_pathologist1.csv'
+    epoches = 1
 
-    os.makedirs(config.save_path, exist_ok=True)
-    lmdb_writer = FeatLMDBWriter(config.save_path)
+
+    datasets = []
+    num_feats = []
+    rel_pathes = []
+    extractor = ExtractorResNet50(resnet50_path)
+    #dataset = Prosate(image_folder, json_folder)
+    dataset = ProsateTest(image_folder, json_folder, csv_file)
+    datawriter = TorchWriter
+    #start = time.time()
     count = 0
-    start = time.time()
-    for prefix in prefixes:
-        print(prefix)
-        image_lists = dataset.image_lists_by_prefix(prefix)
-        #print(image_lists.shape)
-        datasets = []
-        num_feats = []
-        rel_pathes = []
-        for image_name in image_lists.flatten():
-            #print(image_name)
-            rel_path, image, bboxes, coords, mask = dataset.get_res_by_image_path(image_name)
-            patch_dataset = Patches(image, coords, bboxes, 64)
-            #if len(bboxes) == 0:
-            #    print(rel_path)
-            #    print(len(patch_dataset))
-            datasets.append(patch_dataset)
-            #print(num_feat, len(patch_dataset))
-            num_feats.append(len(patch_dataset))
-            rel_pathes.append(rel_path)
+    for rel_path, image, bboxes, coords in dataset:
+        patch_dataset = Patches(image, coords, bboxes, 64)
+        #if len(bboxes) == 0:
+        #    print(rel_path)
+        #    print(len(patch_dataset))
+        datasets.append(patch_dataset)
+        #print(num_feat, len(patch_dataset))
+        num_feats.append(len(patch_dataset))
+        rel_pathes.append(rel_path)
 
 
-        count += sum(num_feats)
+        #count += sum(num_feats)
+        count += 1
+        if count % 1000 == 0:
 
-        datasets = torch.utils.data.ConcatDataset(datasets)
-        data_loader = DataLoader(datasets, num_workers=4, batch_size=3000, shuffle=False)
+            datasets = torch.utils.data.ConcatDataset(datasets)
+            data_loader = DataLoader(datasets, num_workers=4, batch_size=3000, shuffle=False)
 
-        node_features = []
-        node_coords = []
-        #wih torch.no_grad():
-        for images, coords in data_loader:
-            output = config.extract_func(images)
-            node_features.append(output)
-            node_coords.extend(coords)
+            for epoch in range(epoches):
+                lmdb_path_epoch = os.path.join(save_path, str(epoch))
+                os.makedirs(lmdb_path_epoch, exist_ok=True)
+                print('saving data to {}.....'.format(lmdb_path_epoch))
+                writer = datawriter(lmdb_path_epoch)
+                generate_features(data_loader, num_feats, rel_pathes, writer, extractor)
+            datasets = []
+            num_feats = []
+            rel_pathes = []
 
-        node_features = np.vstack(node_features)
-        node_coords = np.vstack(node_coords)
-        prev = 0
-        #print('here...........................................')
-        #print(len(rel_pathes), len(num_feats))
-        #test_cum = 0
-        lmdb_pair = []
-        for rel_path, num_feat in zip(rel_pathes, num_feats):
+    datasets = torch.utils.data.ConcatDataset(datasets)
+    data_loader = DataLoader(datasets, num_workers=4, batch_size=3000, shuffle=False)
+    for epoch in range(epoches):
+        lmdb_path_epoch = os.path.join(save_path, str(epoch))
+        os.makedirs(lmdb_path_epoch, exist_ok=True)
+        print('saving data to {}.....'.format(lmdb_path_epoch))
+        writer = datawriter(lmdb_path_epoch)
+        generate_features(data_loader, num_feats, rel_pathes, writer, extractor)
 
-            sub_feat = node_features[prev : prev+num_feat]
-            sub_coord = node_coords[prev : prev+num_feat]
-            #print(sub_feat.shape, sub_coord.shape)
-            val = {
-                'feat' : sub_feat,
-                'coord' : sub_coord
-            }
-            val = pickle.dumps(val)
-            rel_path = rel_path.replace('.png', '.npy')
-            #print(rel_path, sub_feat.shape, sub_coord.shape)
-            prev += num_feat
-            lmdb_pair.append([rel_path.encode(), val])
-        lmdb_writer.add_pair(lmdb_pair)
+    print(count)
+
+
+
+
+
+
+    #node_features = []
+    #node_coords = []
+    ##wih torch.no_grad():
+    #for images, coords in data_loader:
+    #    output = extractor(images)
+    #    node_features.append(output)
+    #    node_coords.extend(coords)
+
+    #node_features = np.vstack(node_features)
+    #node_coords = np.vstack(node_coords)
+    #prev = 0
+    ##print('here...........................................')
+    ##print(len(rel_pathes), len(num_feats))
+    ##test_cum = 0
+    #lmdb_pair = []
+    #for rel_path, num_feat in zip(rel_pathes, num_feats):
+    #    print(rel_path, num_feat)
+
+    #    sub_feat = node_features[prev : prev+num_feat]
+    #    sub_coord = node_coords[prev : prev+num_feat]
+    #    #print(sub_feat.shape, sub_coord.shape)
+    #    val = {
+    #        'feat' : sub_feat,
+    #        'coord' : sub_coord
+    #    }
+    #    val = pickle.dumps(val)
+    #    rel_path = rel_path.replace('.png', '.npy')
+    #    #print(rel_path, sub_feat.shape, sub_coord.shape)
+    #    prev += num_feat
+    #    lmdb_pair.append([rel_path.encode(), val])
+
+    #lmdb_writer.add_pair(lmdb_pair)
+    #print(count / (time.time() - start))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    ################   colon
+    #config = Res50JsonMaskConfig()
+    #dataset = config.dataset
+    #prefixes = dataset.image_prefixes()
+    #print(len(prefixes))
+
+    #os.makedirs(config.save_path, exist_ok=True)
+    #lmdb_writer = FeatLMDBWriter(config.save_path)
+    #count = 0
+    #start = time.time()
+    #for prefix in prefixes:
+    #    print(prefix)
+    #    image_lists = dataset.image_lists_by_prefix(prefix)
+    #    datasets = []
+    #    num_feats = []
+    #    rel_pathes = []
+    #    for image_name in image_lists.flatten():
+    #        rel_path, image, bboxes, coords, mask = dataset.get_res_by_image_path(image_name)
+    #        patch_dataset = Patches(image, coords, bboxes, 64)
+    #        #if len(bboxes) == 0:
+    #        #    print(rel_path)
+    #        #    print(len(patch_dataset))
+    #        datasets.append(patch_dataset)
+    #        #print(num_feat, len(patch_dataset))
+    #        num_feats.append(len(patch_dataset))
+    #        rel_pathes.append(rel_path)
+
+
+    #    count += sum(num_feats)
+
+    #    datasets = torch.utils.data.ConcatDataset(datasets)
+    #    data_loader = DataLoader(datasets, num_workers=4, batch_size=3000, shuffle=False)
+
+    #    node_features = []
+    #    node_coords = []
+    #    #wih torch.no_grad():
+    #    for images, coords in data_loader:
+    #        output = config.extract_func(images)
+    #        node_features.append(output)
+    #        node_coords.extend(coords)
+
+    #    node_features = np.vstack(node_features)
+    #    node_coords = np.vstack(node_coords)
+    #    prev = 0
+    #    #print('here...........................................')
+    #    #print(len(rel_pathes), len(num_feats))
+    #    #test_cum = 0
+    #    lmdb_pair = []
+    #    for rel_path, num_feat in zip(rel_pathes, num_feats):
+
+    #        sub_feat = node_features[prev : prev+num_feat]
+    #        sub_coord = node_coords[prev : prev+num_feat]
+    #        #print(sub_feat.shape, sub_coord.shape)
+    #        val = {
+    #            'feat' : sub_feat,
+    #            'coord' : sub_coord
+    #        }
+    #        val = pickle.dumps(val)
+    #        rel_path = rel_path.replace('.png', '.npy')
+    #        #print(rel_path, sub_feat.shape, sub_coord.shape)
+    #        prev += num_feat
+    #        lmdb_pair.append([rel_path.encode(), val])
+    #    lmdb_writer.add_pair(lmdb_pair)
+
+    #    print(count / (time.time() - start))
 
         #assert test_cum == sum(num_feats)
 
@@ -936,7 +1279,6 @@ if __name__ == '__main__':
 
         #print(rel_path)
 
-        print(count / (time.time() - start))
 
 
             #print(image.shape, len(bboxes), bboxes[0], len(coords), coords[0], mask)
@@ -947,6 +1289,7 @@ if __name__ == '__main__':
             #image = cv2.resize(image, (0, 0), fx=0.25, fy=0.25)
             #cv2.imwrite('test.png', image)
             #sys.exit()
+
 
     #def image_lists_by_prefix(self, prefix):
     #    return self.image_dataset.file_grids[prefix].flatten()

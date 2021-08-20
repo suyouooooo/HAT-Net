@@ -242,12 +242,17 @@ def _get_batch_features_new(numpy_queue, info_queue, label):
                 #print(name)
                 #print(os.path.join(self.feature_save_path, name))
                 #print(os.path.join(self.distance_save_path, name))
-                # 把特征表示和质心表示都存储起来
-                np.save(os.path.join(self.feature_save_path, name), node_feature.astype(np.float32))
-                np.save(os.path.join(self.distance_save_path, name), node_coordinate.astype(np.float32))
 
-                # 计算质心之间的euc_dist
-                euc_dist(os.path.join(self.distance_save_path, name))
+
+                print(os.path.join(self.feature_save_path, name))
+                print(os.path.join(self.distance_save_path, name))
+
+                # 把特征表示和质心表示都存储起来
+                #np.save(os.path.join(self.feature_save_path, name), node_feature.astype(np.float32))
+                #np.save(os.path.join(self.distance_save_path, name), node_coordinate.astype(np.float32))
+
+                ## 计算质心之间的euc_dist
+                #euc_dist(os.path.join(self.distance_save_path, name))
 
 
                 info_queue.put(name)
@@ -281,8 +286,12 @@ def build_feature(label):
     _get_batch_features_new(nameQueue, infoQueue, label)
 
 if __name__ == '__main__':
-    mean = (0.7862793912386359, 0.6027306811087783, 0.7336620786688793) #bgr
-    std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
+    #mean = (0.7862793912386359, 0.6027306811087783, 0.7336620786688793) #bgr
+    #std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
+
+    mean = [0.73646324, 0.56556627, 0.70180897] # bgr
+        #self.std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
+    std = [0.18869222, 0.21968669, 0.17277594] # b
     valid_transforms = transforms.Compose([
         transforms.ToPILImage(),
         transforms.Resize((64, 64)),
@@ -291,7 +300,7 @@ if __name__ == '__main__':
     ])
     net = network('resnet50', 4, False)
     #net.load_state_dict(torch.load('/data/by/tmp/HGIN/checkpoint/resnet50/Monday_31_May_2021_00h_40m_26s/17-best.pth'))
-    net.load_state_dict(torch.load('/data/by/tmp/HGIN/checkpoint/resnet50/Tuesday_01_June_2021_19h_43m_05s/191-best.pth'))
+    net.load_state_dict(torch.load('/data/by/tmp/HGIN/checkpoint/resnet50/Tuesday_01_June_2021_19h_43m_05s/191-best.pth'))  # colon
     net = net.cuda()
     labels = [
         #'fold_1/1_normal',
