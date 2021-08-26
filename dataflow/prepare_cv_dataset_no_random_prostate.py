@@ -13,7 +13,7 @@ import torch
 #from multiprocessing import Pool
 from torch_geometric.data import Data, DataLoader
 from torch_geometric.nn import radius_graph
-#from torch_geometric.nn.pool import avg_pool
+from torch_geometric.nn.pool import fps
 
 import copy
 import random
@@ -32,7 +32,7 @@ from torch_scatter import scatter
 from torch_geometric.nn.pool.consecutive import consecutive_cluster
 from torch_geometric.nn.pool.pool import pool_pos
 
-from stich import LMDBFolder, LMDBDataset
+from stich import LMDBFolder, LMDBDataset, PtFolders, PtDataset
 
 def _avg_pool_x(cluster, x, size=None):
     return scatter(x, cluster, dim=0, dim_size=size, reduce='mean')
@@ -134,6 +134,7 @@ def add_pool(cluster, data):
 
 def gen_cell_graph(data):
     subdata = copy.deepcopy(data)
+
     edge_index = radius_graph(subdata.pos, 100, None, True, 8)
        #else:
        #    edge_index = random_sample_graph2(choice, distance, 100, True,
@@ -172,6 +173,141 @@ def read_data(res, path):
     #print(data)
 
     return data
+
+class ExCRCPt:
+    def __init__(self, path, image_size):
+
+        folder = PtFolders(path)
+        self.dataset = PtDataset(folder, image_size)
+
+        print(len(self.dataset))
+        #self.npy_names = []
+        #for pt in glob.iglob(os.path.join(path, '**', '*.pt'), recursive=True):
+        #    self.npy_names.append(pt)
+
+        #self.env = lmdb.open(path, map_size=1099511627776, readonly=True, lock=False)
+        #with self.env.begin(write=False) as txn:
+        #    self.image_names= [key.decode() for key in txn.cursor().iternext(keys=True, values=False)]
+
+        #cache_file = '_cache_' + ''.join(c for c in path if c in string.ascii_letters)
+        #cache_path = os.path.join(path, cache_file)
+        #if os.path.isfile(cache_path):
+        #    self.npy_names = pickle.load(open(cache_path, "rb"))
+        #else:
+        #    with self.env.begin(write=False) as txn:
+        #        self.npy_names = [key for key in txn.cursor().iternext(keys=True, values=False)]
+        #    pickle.dump(self.npy_names , open(cache_path, "wb"))
+
+        #self.npy_names = [key.decode() for key in self.npy_names]
+
+    def len(self):
+        return len(self)
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def get(idx):
+        return self[idx]
+
+    def __getitem__(self, idx):
+        #npy_path = self.npy_names[idx]
+        #data = torch.load(npy_path)
+        path, data = self.dataset[idx]
+        #print('mmmmmmmmmm', path, idx, data)
+
+        #with self.env.begin(write=False) as txn:
+        #    data = txn.get(npy_path.encode())
+        #    data = pickle.loads(data)
+
+        #print(npy_path, data, idx, '111111111111')
+        #for key, value in data.items():
+        #    print(key, value.shape, idx, '222222222222')
+        data = read_data(data, path)
+        #print(data, 'fkfkfkfk')
+        #print(data, npy_path, idx, '33333333333333')
+        if len(data.x) <= 5:
+            #idx = random.choice()
+            idx = 1
+            path, data = self.dataset[idx]
+            data = read_data(data, path)
+            #data = gen_cell_graph(data)
+            #
+            #print(data)
+            #return data
+
+        data.path = path
+        data = fuse(data)
+        data = gen_cell_graph(data)
+        #print('gen', data.path, data.y)
+        #import sys; sys.exit()
+        return data
+
+def fuse(data):
+    """data.x, data.pos"""
+    length = len(data.x)
+    l1 = length
+    sample = torch.rand(length).topk(int(length // 2)).indices
+    mask = torch.zeros(length, dtype=torch.bool)
+    mask.scatter_(dim=0, index=sample, value=True)
+    #print(mask.shape, data)
+    #print((mask == 1).sum())
+
+    fps_x = data.x[mask]
+    fps_pos = data.pos[mask]
+    l2 = len(fps_x)
+    #print(fps_x.shape)
+    #print(fps_pos.shape)
+    #fps_data = Data(x=fps_x, pos=fps_pos)
+
+    #fps_x = fps_x[:2]
+    batch = torch.zeros((len(fps_pos))).long()
+
+    #x = torch.Tensor([[-1, -1], [-1, 1], [1, -1], [1, 1]]) * 300
+    #print(x.dtype)
+    #x = fps_pos[:4].float()
+    #print(x.dtype)
+    #batch = torch.tensor([0, 0, 0, 0])
+    #batch = torch.zeros((len(x))).long()
+    #print(x.shape, fps_pos.shape)
+    #print(x.shape, batch.shape)
+    #batch = torch.tensor([0, 0, 0, 0])
+    #fps_idx = fps(x, ratio=0.5)
+    #fps_idx = fps(x, ratio=0.5)
+    #if len(fps_pos) == 0:
+        #print(data, fps_pos)
+    #try:
+    fps_idx = fps(fps_pos.float(), batch=batch, ratio=0.7, random_start=False)
+    #except Exception as e:
+        #print(e, fps_pos)
+
+
+    l3 = len(fps_idx)
+    #print(fps_idx, 111111111111111)
+    fps_x = fps_x[fps_idx]
+    fps_pos = fps_pos[fps_idx]
+    fps_data =Data(x=fps_x, pos=fps_pos)
+
+    random_x = data.x[~mask]
+    random_pos = data.pos[~mask]
+
+    length = len(random_x)
+    sample = torch.rand(length).topk(int(length * 0.3)).indices
+    mask = torch.zeros(length, dtype=torch.bool)
+    mask.scatter_(dim=0, index=sample, value=True)
+
+    random_x = random_x[mask]
+    random_pos = random_pos[mask]
+    l4 = len(random_x)
+    #random_data = Data(x=random_x, pos=fps_pos)
+
+    fps_data.x = torch.cat([fps_data.x, random_x], dim=0)
+    fps_data.pos = torch.cat([fps_data.pos, random_pos], dim=0)
+
+    data.x = fps_data.x
+    data.pos = fps_data.pos
+
+    return data
+
 
 class ProsatePt:
     def __init__(self, path):
@@ -274,6 +410,9 @@ def write_data(save_path, data):
     #print(111,  save_path)
     #print(data)
     #sys.exit()
+    if len(data.x) <= 5:
+        return
+
     torch.save(data.clone(), save_path)
 
 def add_sub_folder(save_path):
@@ -303,6 +442,34 @@ def write_batch(save_path, batch):
     for i in range(b.num_graphs):
         write_data(save_path, batch[i])
 
+class DataSetFactory:
+    def __init__(self, dataset):
+        self.dataset = datsaet
+
+    def __call__(path, image_size=224 * 8):
+        return self.dataset(path, image_size)
+
+def run(pathes, data_fact, save_path):
+
+
+    for fp in pathes:
+        #print(fp)
+        #data_set = ProsatePt(fp)
+        #data_set = ExCRCPt(fp, 224 * 8)
+        data_set = data_fact(fp)
+        data_loader = DataLoader(data_set, num_workers=2, batch_size=16, shuffle=True)
+        #save_path = gen_save_folder(fp)
+        #save_path
+        #print(2222, save_path)
+        os.makedirs(save_path, exist_ok=True)
+        #import sys; sys.exit()
+        for idx, b in enumerate(data_loader):
+            #print(b)
+            #print(33333, save_path)
+            #import sys; sys.exit()
+            write_batch(save_path, b)
+            print('[{}/{}].... {}'.format(idx + 1, len(data_loader), save_path))
+
 if __name__ == '__main__':
     #image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images/images/'
     #lmdb_root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat_Aug/'
@@ -315,21 +482,69 @@ if __name__ == '__main__':
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph_Aug/0/proto/fix_full_cia_knn/'
     #root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat_Aug/Before_FC/0'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph_Aug/Before_FC'
-    root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat/5Crops_Aug'
-    save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug'
+    #root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat/5Crops_Aug'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug'
+    #root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat_Aug/test'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/test'
+    #root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat_Aug/train'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/train'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_3/1_normal'
+    save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_2/1_normal'
 
-    pathes = pt_folders(root)
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_1/2_low_grade/'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_1/3_high_grade/'
 
-    for fp in pathes:
-        print(fp)
-        data_set = ProsatePt(fp)
-        data_loader = DataLoader(data_set, num_workers=4, batch_size=16)
-        #save_path = gen_save_folder(fp)
-        #save_path
-        #print(2222, save_path)
-        os.makedirs(save_path, exist_ok=True)
-        for idx, b in enumerate(data_loader):
-            #print(b)
-            #print(33333, save_path)
-            write_batch(save_path, b)
-            print('[{}/{}].... {}'.format(idx + 1, len(data_loader), save_path))
+    #root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/'
+    #root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_3/1_normal/'
+    root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_2/1_normal/'
+
+    #root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_1/2_low_grade/'
+    #root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_1/3_high_grade/'
+
+    root = [
+        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_2/1_normal/',
+
+        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_1/2_low_grade/',
+        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_2/2_low_grade/',
+        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_3/2_low_grade/',
+
+        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_1/3_high_grade',
+        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_2/3_high_grade',
+        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_3/3_high_grade',
+    ]
+    save_path = [
+        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_2/1_normal',
+
+        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_1/2_low_grade',
+        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_2/2_low_grade',
+        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_3/2_low_grade',
+
+        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_1/3_high_grade',
+        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_2/3_high_grade',
+        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_3/3_high_grade',
+    ]
+    for r, s in zip(root, save_path):
+        print(r)
+        print(s)
+        continue
+        pathes = pt_folders(r)
+        data_fact = DataSetFactory(ExCRCPt)
+
+        run(pathes, data_fact, s)
+    #for fp in pathes:
+    #    #print(fp)
+    #    #data_set = ProsatePt(fp)
+    #    #data_set = ExCRCPt(fp, 224 * 8)
+    #    data_set = data_fact(fp)
+    #    data_loader = DataLoader(data_set, num_workers=2, batch_size=16, shuffle=True)
+    #    #save_path = gen_save_folder(fp)
+    #    #save_path
+    #    #print(2222, save_path)
+    #    os.makedirs(save_path, exist_ok=True)
+    #    #import sys; sys.exit()
+    #    for idx, b in enumerate(data_loader):
+    #        #print(b)
+    #        #print(33333, save_path)
+    #        #import sys; sys.exit()
+    #        write_batch(save_path, b)
+    #        print('[{}/{}].... {}'.format(idx + 1, len(data_loader), save_path))
