@@ -15,6 +15,7 @@ def slice_image(image, win_size):
 
     h, w = image.shape[:2]
     #print(image.shape)
+    print(win_size, w)
     assert w %  win_size== 0
     assert h %  win_size== 0
 
@@ -90,12 +91,15 @@ def slice_prostate(image_path, save_path, unit_size):
 if __name__ == '__main__':
     image_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_prostate_tcga/data/images/'
     save_path = ''
-    unit_size = 310
+    #unit_size = 310
+    unit_size = 224
     #path = '/data/smb/数据集/结直肠/病理学/Extended_CRC/train/Grade2_Patient_007_029810_066073.png'
     src_path = '/data/smb/数据集/结直肠/病理学/Extended_CRC/Original_Images/'
+    #src_path = '/data/smb/syh/colon_dataset/CRC_Dataset'
     #src_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/raw/CRC/fold_1/'
     #dest_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_su/raw/Extended_CRC'
     dest_path = 'test_can_be_del3'
+    #dest_path = 'crc_sliced'
     #cache_path = '/data/by/tmp/HGIN/cache'
 
     csv_file = 'dataflow/extended_crc_fold_info.csv'
@@ -121,7 +125,7 @@ if __name__ == '__main__':
         #patches = crop_image(image, 224)
         patches = slice_image(image, 224)
         image_name = os.path.basename(i)
-        fold_id = split_info[image_name]
+        #fold_id = split_info[image_name]
         #fold_id
         #if ''
         class_name = extract_class_name(image_name)
@@ -147,7 +151,7 @@ if __name__ == '__main__':
 
         #print(class_name)
         fold_folder = 'fold_{}'.format(int(fold_id) + 1)
-        patch_save_path = os.path.join(dest_path, fold_folder, class_name)
+        patch_save_path = os.path.join(dest_path, class_name)
         #print(class_name, grade_id)
         #patch_save_path = os.path.join(cache_path, fold_folder, class_name)
         save_patches(patches, patch_save_path, image_name, grade_id, printable=False)

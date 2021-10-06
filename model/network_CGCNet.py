@@ -297,7 +297,7 @@ class SoftPoolingGcnEncoder(nn.Module):
         output = torch.cat(out_all, 1)
         output = self.pred_model(output)
 
-        if self.training:
-            cls_loss = F.cross_entropy(output, label, size_average=True)
-            return output, cls_loss
-        return output
+        #if self.training:
+        cls_loss = F.cross_entropy(output, label, size_average=True)
+        return output, cls_loss
+        #return output

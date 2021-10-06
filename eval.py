@@ -1,3 +1,4 @@
+import glob
 from common.metric import ImgLevelResult
 import numpy as np
 import sklearn.metrics as metrics
@@ -16,7 +17,7 @@ from torch.optim import lr_scheduler
 from model import network_GIN_Hierarchical
 from model.network_GIN_baiyu import HatNet
 from torch_geometric.nn import DataParallel
-from dataflow.data import prepare_train_val_loader
+from dataflow.data import prepare_train_val_loader, get_ecrc_dataset, get_bach_dataset
 from setting import CrossValidSetting as DataSetting
 import torch.utils.checkpoint as cp
 # os.environ["CUDA_VISIBLE_DEVICES"] = '1'
@@ -34,12 +35,40 @@ DATE_FORMAT = '%A_%d_%B_%Y_%Hh_%Mm_%Ss'
 #time of we run the script
 TIME_NOW = datetime.now().strftime(DATE_FORMAT)
 
+def write_csv(image_names, results):
+    import csv
+    import re
+    header = ['case', 'class']
+    #csv_fp = generate_csv_path(label_folder)
+    csv_fp = 'pred.csv'
+    #print(csv_fp)
+    with open(csv_fp, 'w', encoding='UTF8') as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        count = 0
+        for image_name, class_id in zip(image_names, results):
+            #print(image_name)
+            image_name = os.path.basename(image_name)
+            #print(help(re.search))
+            image_id = re.search(r'test([0-9]+)\.tif', image_name).group(1)
+            #print(image_id)
+            row = [image_id, class_id]
+            if class_id != 0:
+                print(row)
+
+            #count += 1
+            #print(row)
+            writer.writerow(row)
+
 def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
-    metric = Metric()
+    #metric = Metric()
+    metric = Metric(num_classes=args.num_classes)
     model.eval()
     device = 'cuda:1' if torch.cuda.device_count()>1 else 'cuda:0'
     torch.cuda.empty_cache()
     finaleval = ImgLevelResult(args)
+    image_names = []
+    results = []
     with torch.no_grad():
         test_time = args.test_epoch if (args.dynamic_graph and name !='Train')else 1
         if args.visualization:
@@ -65,8 +94,34 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
                     data.to('cuda:0')
                     label = data.y.cpu().numpy()
 
-                ypred, _, = model(x)
+                for p in patch_name:
+                    print(p)
+                    image_names.append(p.split('_grade_')[0] + '.tif')
+                    #image_names.append(p.replace('_grade_')[0].replace('test', ''))
+                print(image_names)
+
+                ypred, _, = model(data)
+                preds = torch.argmax(ypred, dim=-1)
+
+                for r in preds:
+                    r = r.cpu().item()
+                    if r == 0:
+                        #print(r)
+                        r = 1
+                        #print(r)
+                        #print()
+                    elif r == 1:
+                        r = 0
+                    #results.append(r.cpu().numpy())
+                    results.append(r)
+                #print(results)
                 metric.update(ypred, torch.tensor(label), patch_name)
+
+    write_csv(image_names, results)
+    from zipfile import ZipFile
+
+    with ZipFile('predictions.zip', 'w') as predictions:
+        predictions.write('pred.csv')
 
     patch_acc = metric.patch_accuracy()
     image_acc_three = metric.image_acc_three_class()
@@ -80,7 +135,9 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
 def cell_graph(args, writer = None):
     # val==test loader since we do cross-val
 
-    train_loader, val_loader, test_loader = prepare_train_val_loader(args)
+    #train_loader, val_loader, test_loader = prepare_train_val_loader(args)
+    #train_loader, val_loader, test_loader = get_ecrc_dataset(args)
+    train_loader, val_loader, test_loader = get_bach_dataset(args)
     setting = DataSetting()
     input_dim = args.input_feature_dim
     if args.task == 'CRC':
@@ -89,6 +146,8 @@ def cell_graph(args, writer = None):
         args.num_classes = 3
     elif args.task == 'TCGA':
         args.num_classes = 2
+    elif args.task == 'BACH':
+        args.num_classes = 4
     else:
         raise ValueError('wrong task name')
     # model = atten_network.SpGAT(18,args.hidden_dim,3, args.drop_out, args.assign_ratio,3)
@@ -105,22 +164,24 @@ def cell_graph(args, writer = None):
     #                                      depth=args.depth,
     #                                      stage=args.stage
     #                                      )
+    model = HatNet(512, 64, args.num_classes)
 
-    model = HatNet(514, 64, args.num_classes)
+    #for i in glob.
     model.load_state_dict(torch.load(args.weight_file)['state_dict'])
 
-    if torch.cuda.device_count() > 1 :
-        print('use %d GPUs for training!'% torch.cuda.device_count())
+    model = model.cuda()
+    #if torch.cuda.device_count() > 1 :
+    #    print('use %d GPUs for training!'% torch.cuda.device_count())
 
-        if args.load_data_list:
-            model = DataParallel(model).cuda()
-        else:
-            model = nn.DataParallel(model).cuda()
-    else:
-        if args.load_data_list and not args.visualization:
-            model = DataParallel(model).cuda()
-        else:
-            model = model.cuda()
+    #    if args.load_data_list:
+    #        model = DataParallel(model).cuda()
+    #    else:
+    #        model = nn.DataParallel(model).cuda()
+    #else:
+    #    if args.load_data_list and not args.visualization:
+    #        model = DataParallel(model).cuda()
+    #    else:
+    #        model = model.cuda()
 
     val_result = evaluate(val_loader, model, args, name='Validation')
     print(val_result)

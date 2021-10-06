@@ -266,9 +266,11 @@ def _resnet(
     ) -> ResNet:
     model = ResNet(block, layers, **kwargs)
     if pretrained:
+        print('loading weights from {}'.format(model_urls[arch]))
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
         model.load_state_dict(state_dict)
+        print('Done')
     return model
 
 def resnet18(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet:

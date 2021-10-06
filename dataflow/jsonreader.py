@@ -1,6 +1,6 @@
 import json
 from collections import namedtuple
-Node = namedtuple('Node', ['centroid', 'bbox', 'contour'])
+Node = namedtuple('Node', ['centroid', 'bbox', 'contour', 'type', 'type_prob'])
 
 
 class NucleiReader:
@@ -48,7 +48,8 @@ class NucleiReader:
                     new_cnts.append(cnt)
             cnts = new_cnts
 
-            res.append(Node(centroid=cen, bbox=bbox, contour=cnts))
+
+            res.append(Node(centroid=cen, bbox=bbox, contour=cnts, type=node.type, type_prob=node.type_prob))
         return res
 
     def read_json(self, json_path):
@@ -91,8 +92,10 @@ class NucleiReader:
             bbox = node['bbox']
             bbox = [b for b in sum(bbox, [])] # y, x
             cnt = node['contour']
+            node_type = node['type']
+            type_prob = node['type_prob']
 
-            res.append(Node(centroid=cen, bbox=bbox, contour=cnt))
+            res.append(Node(centroid=cen, bbox=bbox, contour=cnt, type=node_type, type_prob=type_prob))
 
         return res
 
@@ -104,8 +107,8 @@ class NucleiReader:
             bbox = res[-1]['bbox']
             bbox = [bbox[:2], bbox[2:]]
             res[-1]['bbox'] = bbox
-            res[-1]['type_prob'] = None
-            res[-1]['type'] = None
+            #res[-1]['type_prob'] = None
+            #res[-1]['type'] = None
 
         return res
 
@@ -122,7 +125,7 @@ class NucleiReader:
 
             contour = [[int(x * scale), int(y * scale)] for [x, y] in node.contour]
             #contour = node['contour']
-            res.append(Node(centroid=cen, bbox=bbox, contour=contour))
+            res.append(Node(centroid=cen, bbox=bbox, contour=contour, type=node.type, type_prob=node.type_prob))
 
         return res
 
@@ -136,8 +139,8 @@ class NucleiReader:
                     "bbox": node['bbox'],
                     "centroid": node['centroid'],
                     "contour": node['contour'],
-                    "type_prob": None,
-                    "type": None,
+                    "type_prob": node['type_prob'],
+                    "type": node['type'],
             }
 
         json_dict = {"mag": mag, "nuc": inst_info_dict}  # to sync the format protocol
@@ -160,7 +163,7 @@ class NucleiReader:
 
                 contour = [[int(x / scale), int(y / scale)] for [x, y] in node.contour]
                 #contour = node['contour']
-                res.append(Node(centroid=cen, bbox=bbox, contour=contour))
+                res.append(Node(centroid=cen, bbox=bbox, contour=contour, type=node.type, type_prob=node.type_prob))
 
         return res
 

@@ -18,12 +18,14 @@ class LMDB:
 
     def add_files(self, pathes):
         with self.env.begin(write=True) as txn:
-            for fp in pathes:
+            for idx, fp in enumerate(pathes):
                 with open(fp, 'rb') as f:
                     image_buff = f.read()
 
                 basename = os.path.basename(fp)
                 txn.put(basename.encode(), image_buff)
+                if idx % 10000 == 0:
+                    print(idx)
 
 class LMDBPt:
     def __init__(self, path, save_path):
@@ -44,26 +46,50 @@ class LMDBPt:
 
                 basename = os.path.basename(fp)
                 data = torch.load(fp)
-                txn.put(basename.encode(), pickle.dumps(data))
-                print(idx, fp)
+                #txn.put(basename.encode(), pickle.dumps(data))
+                #print(idx, fp)
+                txn.put(fp.encode(), pickle.dumps(data))
 
 if __name__ == '__main__':
-    pt_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug'
-    save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_LMDB'
+    #pt_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_LMDB'
+    #pt_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_ColorJitter'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_ColorJitter_LMDB/'
+    #pt_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/test'
+    #pt_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_CPC/'
+    #pt_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Avg_64/proto/fix_avg_cia_knn/0/'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/test_lmdb/'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_CPC_LMDB'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Avg_64/proto/fix_avg_cia_knn/0/'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Avg_64_LMDB/'
+    #image_path = '/data/hdd1/by/dataset/Patches'
+    image_path = 'tmp'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images/Patches'
+    save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Images/NucleiPatches'
+    search_path = os.path.join(image_path, '**', '*.jpg')
+    writer = LMDB(save_path)
+    writer.add_files(glob.iglob(search_path, recursive=True))
+
+    #count = 0
+    #for i in glob.iglob('tmp/**/*.jpg', recursive=True):
+    #    count += 1
+
+    #print(count)
     #writer = LMDBPt(pt_path, save_path)
+
     #writer.write()
-    env = lmdb.open(save_path, map_size=1099511627776, readonly=True, lock=False)
+    #env = lmdb.open(save_path, map_size=1099511627776, readonly=True, lock=False)
 
-    with env.begin(write=False) as txn:
-        image_names = [key for key in txn.cursor().iternext(keys=True, values=False)]
+    #with env.begin(write=False) as txn:
+    #    image_names = [key for key in txn.cursor().iternext(keys=True, values=False)]
 
-    print(len(image_names))
-    import random
-    image_name = random.choice(image_names)
-    with env.begin(write=False) as txn:
-        image_data = txn.get(image_name)
-        image_data = pickle.loads(image_data)
-        print(image_data)
+    #print(len(image_names))
+    #import random
+    #image_name = random.choice(image_names)
+    #with env.begin(write=False) as txn:
+    #    image_data = txn.get(image_name)
+    #    image_data = pickle.loads(image_data)
+    #    print(image_data)
 
 
 

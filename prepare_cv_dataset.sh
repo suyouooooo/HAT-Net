@@ -15,7 +15,8 @@ which python
 
 #python /data/by/tmp/HGIN/dataflow/extract_node_features.py
 #python dataflow/prepare_cv_dataset_no_random_excrc.py
-python /data/by/tmp/HGIN/dataflow/construct_feature_graph_cnn.py
+#python /data/by/tmp/HGIN/dataflow/construct_feature_graph_cnn.py
+python /data/hdd1/by/HGIN/dataflow/lmdb_writter.py
 #python /data/by/tmp/HGIN/dataflow/prepare_cv_dataset_no_random.py
 #python /data/by/tmp/HGIN/HGIN/common/utils.py
 #python  dataflow/construct_training_data.py

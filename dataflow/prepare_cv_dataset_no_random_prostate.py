@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import pickle
 import string
+import time
 
 import sys
 from pathlib import Path
@@ -350,10 +351,15 @@ class ProsatePt:
         #print(npy_path, data, idx, '111111111111')
         #for key, value in data.items():
         #    print(key, value.shape, idx, '222222222222')
+        #shape = 'before', data['feat'].shape
         data = read_data(data, npy_path)
+        #aa = len(data.x)
+        #data = fuse(data)
+        #print(aa, data.x.shape)
         #print(data, npy_path, idx, '33333333333333')
         data = gen_cell_graph(data)
         data.path = npy_path
+        #print(shape, 'after', data)
         #print('gen', data.path, data.y)
         return data
 
@@ -413,6 +419,7 @@ def write_data(save_path, data):
     if len(data.x) <= 5:
         return
 
+    #print(save_path)
     torch.save(data.clone(), save_path)
 
 def add_sub_folder(save_path):
@@ -439,25 +446,27 @@ def pt_folders(root):
     return list(pathes)
 
 def write_batch(save_path, batch):
-    for i in range(b.num_graphs):
+    for i in range(batch.num_graphs):
         write_data(save_path, batch[i])
 
 class DataSetFactory:
     def __init__(self, dataset):
-        self.dataset = datsaet
+        self.dataset = dataset
 
-    def __call__(path, image_size=224 * 8):
-        return self.dataset(path, image_size)
+    def __call__(self, path, image_size=224 * 8):
+        #return self.dataset(path, image_size)
+        return self.dataset(path)
 
 def run(pathes, data_fact, save_path):
 
 
+    start = time.time()
     for fp in pathes:
         #print(fp)
         #data_set = ProsatePt(fp)
         #data_set = ExCRCPt(fp, 224 * 8)
         data_set = data_fact(fp)
-        data_loader = DataLoader(data_set, num_workers=2, batch_size=16, shuffle=True)
+        data_loader = DataLoader(data_set, num_workers=4, batch_size=32, shuffle=True)
         #save_path = gen_save_folder(fp)
         #save_path
         #print(2222, save_path)
@@ -468,7 +477,48 @@ def run(pathes, data_fact, save_path):
             #print(33333, save_path)
             #import sys; sys.exit()
             write_batch(save_path, b)
-            print('[{}/{}].... {}'.format(idx + 1, len(data_loader), save_path))
+            finish = time.time()
+            avg_speed = (idx + 1) * len(b) / (finish - start)
+            print('[{}/{}]....avg speed:{:2f}, {}'.format(idx + 1, len(data_loader), avg_speed, save_path))
+
+def gen_ecrc_save(save_path):
+    subdirs = [
+        'fold_1/1_normal/',
+        'fold_1/2_low_grade/',
+        'fold_1/3_high_grade/',
+
+        'fold_2/1_normal/',
+        'fold_2/2_low_grade/',
+        'fold_2/3_high_grade/',
+
+        'fold_3/1_normal/',
+        'fold_3/2_low_grade/',
+        'fold_3/3_high_grade/',
+    ]
+    return [os.path.join(save_path, p) for p in subdirs]
+
+def gen_ecrc_root(root_path):
+    subdirs = [
+        'fold_1/1_normal/',
+        'fold_1/2_low_grade/',
+        'fold_1/3_high_grade/',
+
+        'fold_2/1_normal/',
+        'fold_2/2_low_grade/',
+        'fold_2/3_high_grade/',
+
+        'fold_3/1_normal/',
+        'fold_3/2_low_grade/',
+        'fold_3/3_high_grade/',
+    ]
+    root = [os.path.join(root_path, p) for p in subdirs]
+    return root
+
+def gen_prostate_root(root_path):
+    return [root_path]
+
+def gen_prostate_save(save_path):
+    return [save_path]
 
 if __name__ == '__main__':
     #image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images/images/'
@@ -489,46 +539,97 @@ if __name__ == '__main__':
     #root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat_Aug/train'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/train'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_3/1_normal'
-    save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_2/1_normal'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_2/1_normal'
 
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_1/2_low_grade/'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_1/3_high_grade/'
 
     #root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/'
     #root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_3/1_normal/'
-    root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_2/1_normal/'
+    #root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_2/1_normal/'
 
     #root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_1/2_low_grade/'
     #root = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_1/3_high_grade/'
 
-    root = [
-        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_2/1_normal/',
+    #src_prefix = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/CPC/0'
+    #save_prefix = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/CPC/'
+    #src_prefix = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/VGGUet/0'
+    #save_prefix = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/VGGUet'
+    #subdirs = [
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat/5Crops_CPC/0/'
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat/5Crops_Aug_CPC/'
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat/ImageNetPretrain/0/fold_1/1_normal/',
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat/ImageNetPretrain/0/fold_1/2_low_grade/',
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat/ImageNetPretrain/0/fold_1/3_high_grade/',
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat/ImageNetPretrain/0/fold_1/1_normal/',
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat/ImageNetPretrain/0/fold_1/2_low_grade/',
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat/ImageNetPretrain/0/fold_1/3_high_grade/',
+    #    #'fold_1/1_normal/',
+    #    #'fold_1/2_low_grade/',
+    #    #'fold_1/3_high_grade/',
 
-        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_1/2_low_grade/',
-        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_2/2_low_grade/',
-        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_3/2_low_grade/',
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat/ImageNetPretrain/0/fold_2/1_normal/',
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat/ImageNetPretrain/0/fold_2/2_low_grade/',
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat/ImageNetPretrain/0/fold_2/3_high_grade/',
 
-        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_1/3_high_grade',
-        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_2/3_high_grade',
-        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_3/3_high_grade',
-    ]
-    save_path = [
-        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_2/1_normal',
+    #    'fold_2/1_normal/',
+    #    'fold_2/2_low_grade/',
+    #    'fold_2/3_high_grade/',
 
-        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_1/2_low_grade',
-        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_2/2_low_grade',
-        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_3/2_low_grade',
+    #    #'fold_3/1_normal/',
+    #    #'fold_3/2_low_grade/',
+    #    #'fold_3/3_high_grade/',
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat/ImageNetPretrain/0/fold_3/1_normal/',
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat/ImageNetPretrain/0/fold_3/2_low_grade/',
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat/ImageNetPretrain/0/fold_3/3_high_grade/',
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_2/1_normal/',
 
-        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_1/3_high_grade',
-        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_2/3_high_grade',
-        '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_3/3_high_grade',
-    ]
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_1/2_low_grade/',
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_2/2_low_grade/',
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_3/2_low_grade/',
+
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_1/3_high_grade',
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_2/3_high_grade',
+    #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/fold_3/3_high_grade',
+    #]
+    ##save_path = [
+    ##    '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/ImageNetPretrain/fold_1/1_normal/',
+    ##    '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/ImageNetPretrain/fold_1/2_low_grade/',
+    ##    '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/ImageNetPretrain/fold_1/3_high_grade/',
+
+    ##    '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/ImageNetPretrain/fold_2/1_normal/',
+    ##    '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/ImageNetPretrain/fold_2/2_low_grade/',
+    ##    '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/ImageNetPretrain/fold_2/3_high_grade/',
+
+    ##    '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/ImageNetPretrain/fold_3/1_normal/',
+    ##    '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/ImageNetPretrain/fold_3/2_low_grade/',
+    ##    '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/ImageNetPretrain/fold_3/3_high_grade/',
+    ##    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_CPC'
+    ##    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_CPC/'
+    ##    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_2/1_normal',
+
+    ##    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_1/2_low_grade',
+    ##    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_2/2_low_grade',
+    ##    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_3/2_low_grade',
+
+    ##    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_1/3_high_grade',
+    ##    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_2/3_high_grade',
+    ##    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/fold_3/3_high_grade',
+    ##]
+    #root = [os.path.join(src_prefix, p) for p in subdirs]
+    #save_path = [os.path.join(save_prefix, p) for p in subdirs]
+
+    root = gen_prostate_root('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat/5Crops_Res50_withtype_Aug')
+    save_path = gen_prostate_save('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Res50_withtype_Aug')
+
     for r, s in zip(root, save_path):
-        print(r)
-        print(s)
-        continue
+        print(r, s)
         pathes = pt_folders(r)
-        data_fact = DataSetFactory(ExCRCPt)
+        #print(pathes)
+        #os.system('ls {} | wc -l'.format(r))
+        #continue
+        #data_fact = DataSetFactory(ExCRCPt)
+        data_fact = DataSetFactory(ProsatePt)
 
         run(pathes, data_fact, s)
     #for fp in pathes:

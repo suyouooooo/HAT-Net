@@ -8,12 +8,13 @@ from torch_geometric.nn import radius_graph
 import random
 import sys
 import os
+import csv
 
 import lmdb
 import numpy as np
 from tqdm import tqdm
-from torch_geometric.utils import sparse_to_dense, dense_to_sparse
-# from torch_geometric.utils import to_dense_adj, dense_to_sparse
+
+from torch.nn.functional import adaptive_avg_pool1d
 
 #sys.path.append(os.getcwd())
 #from setting import CrossValidSetting
@@ -308,6 +309,11 @@ std = [2.1493e-03, 6.5049e-04, 2.1906e-04, 6.3348e-04, 6.4822e-04, 4.9847e-04,
         1.6395e-03, 3.0857e-04, 1.6361e-04, 4.7413e-04, 6.1554e-04, 4.9777e-04,
         9.5762e-04, 2.7785e-04, 1.8610e+05, 1.8251e+05]
 
+def pooling(x):
+    x = x.unsqueeze(0)
+    x = adaptive_avg_pool1d(x, (256))
+    x = x.squeeze()
+    return x
 
 class TCGAProstateLMDB(Dataset):
     def __init__(self, root, transforms=None):
@@ -327,8 +333,18 @@ class TCGAProstateLMDB(Dataset):
             #self.idxlist.append(os.path.basename(fp))
         self.file_names = self.idxlist
         self.transforms = transforms
-        self.mean = torch.tensor(mean)
-        self.std = torch.tensor(std)
+        #self.mean = torch.tensor(mean)
+        #self.std = torch.tensor(std)
+
+        self.mean = torch.tensor(np.load(
+            '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_CPC/mean.npy'
+            #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_CPC_LMDB_256/mean.npy'
+        ))
+        self.std = torch.tensor(np.load(
+            '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_CPC/std.npy'
+            #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_CPC_LMDB_256/std.npy'
+        ))
+
 
     def filepath(self):
         return self.file_names
@@ -347,10 +363,175 @@ class TCGAProstateLMDB(Dataset):
             data = self.transforms(data)
 
         data.patch_idx = torch.tensor([idx])
-        data.x = torch.cat([data.x, data.pos], dim=1)
+        #data.x = pooling(data.x)
+        #print(data.x.shape)
+        #data.x = torch.cat([data.x, data.pos], dim=1)
         data.x = (data.x - self.mean) / self.std
 
+        data.x = data.x.float()
+        data.x[torch.isnan(data.x)] = 0
+        data.x[torch.isinf(data.x)] = 0
         return data
+
+
+class TCGAProstateTestNormalize(Dataset):
+    def __init__(self, root, transforms=None):
+        super().__init__(root)
+        self.num_nodes = 548
+        self.root = root
+        search_path = os.path.join(self.root, '**', '*.pt')
+        self.file_names = []
+        self.idxlist = []
+#        self.labels = self.read_csv(csv_file)
+        for fp in glob.iglob(search_path, recursive=True):
+            #before = fp
+            #fp = self.fix_label(fp)
+            #if before != fp:
+                #print(before, fp)
+            self.file_names.append(fp)
+            self.idxlist.append(os.path.basename(fp))
+        self.transforms = transforms
+        #self.mean = torch.tensor(mean)
+        #self.std = torch.tensor(std)
+        self.eps = 1e-7
+        self.mean = torch.tensor(np.load(os.path.join(root, 'mean.npy')))
+        #self.mean = torch.tensor(np.load(
+        #    '/data/hdd1/by/HGIN/acc872_prostate_5cropsAug/stats/mean.npy' # 87.2 withtypes
+        #))
+        self.std = torch.tensor(np.load(os.path.join(root, 'std.npy')))
+        #self.std = torch.tensor(np.load(
+        #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_CPC/std.npy'
+        #    '/data/hdd1/by/HGIN/acc872_prostate_5cropsAug/stats/std.npy' # 87.2 withtypes
+        #))
+
+        self.min = torch.tensor(np.load(os.path.join(root, 'min.npy')))
+        #self.min = torch.tensor(np.load(
+        #    '/data/hdd1/by/HGIN/acc872_prostate_5cropsAug/stats/min.npy' # 87.2 withtypes
+        #))
+        self.max = torch.tensor(np.load(os.path.join(root, 'max.npy')))
+        #self.max = torch.tensor(np.load(
+        #    #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_CPC/std.npy'
+        #    '/data/hdd1/by/HGIN/acc872_prostate_5cropsAug/stats/max.npy' # 87.2 withtypes
+        #))
+        #self.mean = torch.tensor(np.load(
+        #    '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Res50_withtype_Aug/mean.npy'
+        #))
+        #self.std = torch.tensor(np.load(
+        #    '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Res50_withtype_Aug/std.npy'
+        #))
+
+    #def fix_label(self, fp):
+    #    base_name = os.path.basename(fp)
+    #    prefix, ext = base_name.split('_grade_')
+    #    label = int(self.labels[prefix])
+    #    if label >= 6:
+    #        label = 2
+    #    else:
+    #        label = 1
+
+    #    ext = str(label) + ext[1:]
+    #    prefix = fp.split('_grade_')[0]
+    #    fp = prefix + '_grade_' + ext
+    #    return fp
+
+    #def read_csv(self, csv_fp):
+    #    image_names = []
+    #    labels = []
+    #    res = {}
+    #    with open(csv_fp) as csvfile:
+    #        reader = csv.DictReader(csvfile)
+    #        for row in reader:
+    #            image_name, label = row['image name'], row['gleason score']
+    #            #image_names.append(image_name)
+    #            #labels.append(label)
+    #            res[image_name.split('.')[0]] = label
+
+    #    return res
+
+    def filepath(self):
+        return self.file_names
+
+    def len(self):
+        return len(self.file_names)
+
+    def get(self, idx):
+        fp = self.file_names[idx]
+        data = torch.load(fp)
+        label = int(fp.split('_grade_')[1][0])
+        #data.y = label
+        #print(data.y, label)
+        #print(111, data.y)
+        data.y = int(data.y)
+        assert data.y == label - 1
+        if self.transforms is not None:
+            data = self.transforms(data)
+
+        data.patch_idx = torch.tensor([idx])
+        #data.x = (data.x - self.mean) / self.std
+        #data.x = data.x.float()
+
+        data.x = self.normalize(data.x).float()
+
+
+        data.x[torch.isnan(data.x)] = 0
+        data.x[torch.isinf(data.x)] = 0
+
+        #print(data.x.max())
+        #print(data.x.min())
+
+        return data
+
+    def normalize(self, x):
+        # normalize to (0, diff)
+        diff = self.max - self.min + self.eps # avoid 0 division
+        x = x - self.min  # larger than 0
+        assert (x < 0).sum() == 0
+        #print((x < 0).sum())
+        mean = self.mean - self.min
+        std = self.std
+
+        # normalize to range (0, 1)
+        #xmax = x.max()
+        #xmin = x.min()
+        # avoid 0 division
+        x = x / diff
+        #print(xmax, xmin, x.max(), x.min(), '33333333333333333333333', diff.max(), diff.min(), )
+        #print(mean.max(), mean.min())
+        #meanmin = mean.min()
+        #meanmax = mean.max()
+        # avoid 0 division
+        mean = mean / diff
+        #print(mean.max(), mean.min(), meanmin, meanmax)
+        # avoid 0 division
+        std = std / diff
+        #print(std.max(), std.min(), 'fffffffffffffffffff')
+        #print(mean.max(), mean.min(), std.max(), std.min())
+
+        #print(std.max(), std.min(), 111111111)
+
+        # normalize to 0 mean, 1 std
+        #tmp = x - mean
+        #print(tmp.min(), tmp.max(), 'ccccccccccccccc')
+        #tmp[tmp < self.eps] = 0
+        #x = tmp / (std + self.eps)
+        #x = x - mean
+        x = (x - mean) / (std + self.eps) # avoid 0 division
+        #print(x.min(), x.max())
+        #print((std < self.eps).sum(), id(std), '11')
+        #print((x > 10).sum(), id(std))
+        #print(x - mean)
+
+        return x
+    #def normalize(self, x):
+    #    #[10, -3]   # max 11, min -5
+    #    diff = self.max - self.min
+    #    x = x - self.min  # larger than 0
+    #    x = x / diff  # normalize to 0 - 1
+    #    #x += self.max
+    #    mean = (self.mean - self.min) / diff # normlized mean
+    #    std = (self.std - self.min) / diff  # normalized std
+
+    #    return (x - mean) / st
 
 class TCGAProstate(Dataset):
     def __init__(self, root, transforms=None):
@@ -363,8 +544,172 @@ class TCGAProstate(Dataset):
             self.file_names.append(fp)
             self.idxlist.append(os.path.basename(fp))
         self.transforms = transforms
-        self.mean = torch.tensor(mean)
-        self.std = torch.tensor(std)
+        #self.mean = torch.tensor(mean)
+        #self.std = torch.tensor(std)
+        self.mean = torch.tensor(np.load(
+            '/data/hdd1/by/HGIN/acc872_prostate_5cropsAug/mean.npy' # 87.2 withtypes
+        ))
+        self.std = torch.tensor(np.load(
+            #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_CPC/std.npy'
+            '/data/hdd1/by/HGIN/acc872_prostate_5cropsAug/std.npy' # 87.2 withtypes
+        ))
+        #self.min = torch.tensor(np.load(
+        #    '/data/hdd1/by/HGIN/acc872_prostate_5cropsAug/stats/min.npy'
+        #))
+        #self.max = torch.tensor(np.load(
+        #    '/data/hdd1/by/HGIN/acc872_prostate_5cropsAug/stats/max.npy'
+        #))
+        #self.mean = torch.tensor(np.load(
+        #    '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Res50_withtype_Aug/mean.npy'
+        #))
+        #self.std = torch.tensor(np.load(
+        #    '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Res50_withtype_Aug/std.npy'
+        #))
+
+        # 87.2 min, max
+        self.min = torch.tensor([4.3911e-04, 6.8368e-04, 1.2180e-03, 6.8484e-04, 9.1849e-04, 1.1716e-03,
+        2.3755e-04, 5.0264e-04, 1.2642e-05, 1.6651e-04, 1.2123e-03, 1.2160e-03,
+        1.1422e-03, 1.9037e-03, 5.5339e-05, 8.7072e-06, 4.7331e-04, 9.1563e-06,
+        5.8562e-04, 5.2311e-04, 1.2937e-03, 9.3132e-05, 1.5212e-04, 1.5709e-03,
+        3.3248e-04, 1.5466e-03, 2.2834e-03, 5.2915e-03, 1.8954e-03, 0.0000e+00,
+        1.7043e-03, 3.8472e-04, 1.6548e-03, 2.8643e-04, 2.4463e-05, 9.4241e-05,
+        1.0951e-04, 1.4391e-03, 1.2519e-04, 4.2508e-04, 4.1371e-05, 2.1444e-04,
+        1.4712e-03, 3.5220e-03, 1.8214e-04, 2.3551e-03, 6.8322e-04, 6.4604e-04,
+        1.5130e-04, 2.7018e-04, 1.4517e-04, 1.8277e-03, 8.7132e-04, 1.0634e-03,
+        3.2717e-04, 1.7751e-03, 2.5075e-03, 1.1024e-03, 2.5484e-04, 7.8869e-04,
+        1.7041e-03, 1.1143e-03, 2.1841e-04, 5.1133e-06, 1.5088e-04, 3.1986e-03,
+        2.4037e-03, 2.9170e-05, 1.5594e-05, 2.7477e-05, 1.7103e-03, 3.6358e-03,
+        8.9318e-04, 2.5046e-04, 1.1570e-03, 3.3594e-04, 1.2457e-03, 5.5588e-04,
+        1.3985e-04, 3.4703e-03, 8.3797e-04, 8.2964e-05, 1.0671e-03, 5.0439e-04,
+        1.6554e-04, 6.0888e-04, 1.3882e-03, 5.9330e-04, 9.0085e-04, 2.2378e-04,
+        1.6597e-03, 9.1312e-04, 1.6969e-03, 1.2435e-03, 1.6145e-03, 7.0798e-05,
+        4.8198e-06, 1.5580e-03, 1.3643e-03, 1.2646e-04, 1.3036e-03, 1.2960e-03,
+        7.6109e-04, 4.8600e-06, 9.0845e-05, 8.9086e-05, 5.0711e-03, 3.9240e-05,
+        5.9202e-05, 1.5360e-03, 9.5820e-04, 3.1015e-04, 5.1271e-03, 1.8517e-03,
+        1.2229e-03, 6.1266e-04, 2.1815e-05, 3.6576e-04, 5.4904e-04, 4.7814e-04,
+        9.1611e-05, 5.6251e-04, 1.0837e-03, 4.8022e-06, 2.0926e-04, 4.5248e-04,
+        1.1040e-03, 1.8207e-03, 4.8254e-04, 9.5227e-04, 4.1687e-04, 1.4865e-04,
+        4.0904e-04, 1.0328e-03, 1.0727e-03, 0.0000e+00, 2.5639e-03, 1.3471e-03,
+        9.4161e-05, 3.9967e-03, 3.3732e-04, 9.3044e-04, 3.5673e-04, 1.4588e-05,
+        1.3769e-03, 3.0957e-04, 2.3616e-04, 1.9704e-03, 2.8356e-04, 7.6077e-04,
+        6.6868e-10, 2.7605e-04, 3.6025e-04, 1.5483e-03, 1.9172e-05, 2.1467e-03,
+        5.6037e-04, 1.8351e-03, 8.9537e-04, 1.0047e-03, 1.8207e-03, 5.3902e-04,
+        1.5384e-03, 2.0302e-04, 0.0000e+00, 2.1379e-03, 1.7659e-03, 1.2147e-03,
+        6.3069e-05, 9.5164e-05, 1.0401e-02, 1.9207e-03, 6.4147e-04, 7.0544e-04,
+        8.5025e-04, 1.5893e-03, 3.5785e-06, 4.9497e-05, 2.3360e-03, 2.0314e-03,
+        9.4208e-05, 3.5759e-03, 2.4121e-03, 5.0099e-04, 9.8710e-06, 1.8537e-03,
+        6.9938e-04, 6.9674e-06, 1.6454e-04, 9.8392e-04, 1.3487e-03, 9.3913e-04,
+        4.5750e-04, 6.9039e-04, 9.9232e-04, 8.1631e-05, 1.3634e-04, 1.0806e-03,
+        1.2012e-04, 7.1603e-04, 1.2179e-04, 1.4614e-03, 6.4218e-04, 1.2035e-03,
+        1.2631e-03, 1.4316e-04, 1.1905e-03, 7.2947e-05, 2.1978e-04, 0.0000e+00,
+        9.7702e-03, 4.4734e-05, 1.6409e-03, 1.9303e-03, 1.5455e-03, 9.4145e-04,
+        1.6356e-03, 1.5364e-03, 7.5783e-04, 6.3521e-05, 1.3607e-03, 5.5455e-05,
+        3.7650e-04, 1.7532e-03, 9.0236e-04, 5.7365e-04, 3.2395e-04, 4.8433e-03,
+        9.8403e-05, 1.3357e-03, 5.3178e-04, 4.7572e-04, 1.2825e-03, 6.2680e-03,
+        1.8637e-05, 1.4176e-03, 5.4545e-04, 5.1017e-04, 2.7942e-03, 6.4470e-05,
+        7.3510e-04, 2.0467e-04, 2.7075e-05, 2.7709e-05, 5.4396e-05, 7.3546e-04,
+        2.4062e-04, 1.7565e-03, 1.1201e-04, 1.2871e-03, 0.0000e+00, 1.0267e-03,
+        1.2039e-03, 2.0118e-04, 2.8424e-04, 3.3560e-04, 1.1072e-03, 1.9145e-04,
+        1.5209e-04, 1.6136e-03, 7.0504e-04, 2.0672e-04, 2.6373e-03, 1.5487e-04,
+        7.2638e-05, 7.4461e-04, 9.5585e-06, 2.3233e-03, 2.5247e-04, 8.9952e-04,
+        6.5953e-04, 1.3060e-03, 2.0010e-03, 7.0678e-05, 5.8312e-04, 3.9396e-04,
+        2.0987e-04, 7.2214e-04, 1.0409e-03, 1.9427e-03, 1.3587e-03, 1.3631e-04,
+        2.5535e-04, 1.2689e-03, 9.4776e-05, 1.3909e-03, 2.0543e-03, 1.4602e-03,
+        5.9804e-06, 2.7373e-05, 4.6252e-04, 4.7033e-04, 2.1588e-03, 1.5971e-03,
+        5.4869e-04, 1.2991e-03, 1.0012e-04, 9.6373e-04, 1.8919e-03, 1.8971e-03,
+        2.8440e-04, 1.4979e-03, 1.7904e-04, 7.0519e-03, 1.0701e-05, 8.1401e-04,
+        2.2424e-03, 8.6021e-04, 2.1475e-03, 6.3654e-03, 2.0216e-04, 2.8820e-03,
+        1.7962e-03, 5.9540e-04, 1.0381e-03, 5.4201e-04, 2.8269e-05, 2.1404e-03,
+        1.0345e-04, 3.6122e-04, 7.8842e-04, 1.2958e-04, 1.8811e-04, 1.3126e-03,
+        5.2281e-05, 8.9026e-04, 1.3220e-03, 1.7333e-04, 5.6477e-04, 1.8275e-03,
+        0.0000e+00, 3.4963e-04, 1.3801e-03, 2.2176e-04, 1.2027e-03, 2.0641e-03,
+        1.6046e-05, 0.0000e+00, 1.6451e-03, 3.1559e-04, 4.7505e-04, 5.5129e-04,
+        1.6215e-03, 3.9901e-04, 1.2704e-03, 1.8980e-03, 6.3488e-04, 2.7052e-04,
+        1.8544e-04, 7.2621e-05, 6.0993e-04, 2.1378e-04, 1.5917e-03, 1.1367e-03,
+        1.7240e-04, 1.4515e-03, 6.2564e-04, 1.0133e-04, 1.3518e-04, 9.6213e-04,
+        5.5654e-04, 5.5153e-04, 1.0776e-05, 1.8696e-03, 4.1268e-03, 4.2193e-04,
+        8.4849e-05, 1.8529e-04, 6.0453e-04, 3.4434e-04, 6.2133e-04, 2.4403e-03,
+        2.0094e-03, 8.9923e-04, 6.1744e-04, 9.7741e-03, 1.1321e-03, 1.9696e-04,
+        2.0985e-03, 5.4383e-03, 2.6045e-04, 1.2416e-03, 1.1262e-03, 1.6516e-03,
+        5.7125e-04, 1.6690e-03, 5.6944e-05, 1.6754e-04, 3.8358e-04, 4.2565e-03,
+        1.8540e-03, 1.0485e-04, 1.5539e-05, 4.5868e-04, 2.9716e-04, 2.0597e-04,
+        9.6790e-05, 1.0016e-03, 2.0850e-04, 2.6841e-04, 1.4421e-04, 1.0706e-03,
+        8.6557e-04, 1.5867e-03, 1.1373e-06, 2.4961e-04, 6.2808e-04, 5.5384e-04,
+        1.8925e-03, 2.2976e-04, 3.0271e-04, 6.8478e-04, 2.1152e-04, 6.7793e-05,
+        4.6312e-05, 5.8769e-04, 6.8363e-04, 6.6891e-04, 2.8810e-04, 3.6682e-04,
+        1.7588e-04, 2.0028e-04, 8.1137e-06, 6.1727e-04, 9.4784e-04, 1.2559e-04,
+        8.9565e-04, 1.4736e-04, 2.2951e-03, 1.6073e-04, 1.0907e-03, 9.7280e-05,
+        2.2067e-03, 3.2879e-03, 3.6894e-03, 2.1289e-03, 5.7497e-04, 2.6089e-04,
+        1.0466e-03, 4.5297e-03, 1.2509e-04, 1.9233e-04, 5.1275e-04, 2.4909e-03,
+        3.1830e-03, 3.2200e-03, 2.3511e-03, 4.5991e-04, 1.8379e-04, 6.8702e-04,
+        3.1808e-03, 1.5642e-04, 7.3930e-04, 1.3253e-03, 1.2882e-04, 2.6747e-03,
+        2.7125e-04, 1.1906e-04, 9.9568e-04, 2.7428e-04, 1.4823e-03, 1.4053e-03,
+        9.4634e-05, 2.0129e-03, 1.4470e-03, 1.2294e-03, 6.5393e-04, 3.9513e-04,
+        1.0779e-04, 3.8318e-04, 4.8101e-05, 4.2584e-04, 5.8564e-04, 1.4444e-04,
+        6.6562e-04, 3.4298e-05, 2.5238e-05, 3.3217e-04, 1.4068e-04, 5.7234e-04,
+        4.8319e-05, 9.0098e-04, 6.9418e-04, 1.8574e-03, 7.6938e-04, 3.4328e-03,
+        5.4100e-05, 1.6815e-03, 5.1753e-04, 8.1333e-05, 6.5604e-04, 1.7154e-03,
+        7.4586e-05, 5.3254e-05, 1.2480e-04, 1.1156e-03, 1.6697e-04, 1.1010e-04,
+        9.1878e-04, 1.0455e-03, 3.1332e-05, 7.3845e-04, 5.2642e-04, 3.8788e-05,
+        1.6549e-03, 6.6887e-04, 1.4891e-03, 1.2090e-03, 1.7435e-04, 1.3559e-04,
+        5.0122e-04, 1.8086e-04])
+        self.max = torch.tensor([0.1454, 0.0776, 0.1033, 1.0961, 0.3344, 0.1744, 0.4317, 0.0958, 0.1641,
+        0.2930, 0.4661, 0.0828, 0.1408, 0.1744, 0.4158, 0.3297, 0.4540, 0.1160,
+        0.3178, 0.1480, 0.5083, 0.1678, 0.1812, 0.3991, 0.2250, 0.0631, 0.0425,
+        0.3196, 0.2953, 0.4453, 0.5666, 0.0863, 0.1541, 0.4719, 0.2327, 0.6645,
+        0.2875, 0.3254, 0.2023, 0.1361, 0.3531, 0.1414, 0.5442, 0.3842, 0.3324,
+        0.1505, 0.0833, 0.0161, 0.2175, 0.4956, 0.1135, 0.0623, 0.2493, 0.2092,
+        0.5868, 0.1435, 0.6975, 0.1546, 0.3400, 0.3449, 0.1237, 0.2691, 0.0227,
+        0.4442, 0.0662, 0.2329, 0.2350, 0.2471, 0.2147, 0.1293, 0.0747, 0.3588,
+        0.6358, 0.1742, 0.3911, 0.2135, 0.3698, 0.1529, 0.1983, 0.5192, 0.5220,
+        0.1041, 0.1903, 0.2215, 0.1979, 0.0374, 0.1572, 0.1107, 0.1861, 0.0467,
+        0.1207, 0.1342, 0.5357, 0.3256, 0.1829, 0.5822, 0.2299, 0.8619, 0.2303,
+        0.0366, 0.0969, 0.1634, 0.1646, 0.0886, 0.1033, 0.3892, 0.2269, 0.3000,
+        0.3468, 0.7216, 0.5435, 0.2583, 0.1375, 0.0328, 0.1376, 0.1181, 0.4950,
+        0.1964, 0.3586, 0.2679, 0.0555, 0.1797, 0.1527, 0.1490, 0.1591, 0.1588,
+        0.1644, 0.0359, 0.2165, 0.1801, 0.2159, 0.3141, 0.3428, 0.2002, 0.0480,
+        0.2543, 0.1536, 0.2038, 1.1338, 0.3717, 0.2055, 0.5004, 0.2507, 0.6223,
+        0.3533, 0.5152, 0.4620, 0.6844, 0.0994, 0.1883, 0.2537, 0.2571, 0.1219,
+        0.1421, 0.2004, 0.1633, 0.1520, 0.0617, 0.7185, 0.0242, 0.0439, 0.8852,
+        0.0422, 0.2563, 0.1992, 0.0938, 0.4831, 0.0784, 0.0994, 0.3854, 0.3479,
+        0.3658, 0.0695, 0.2303, 0.0999, 0.2220, 0.3202, 0.2175, 0.2074, 0.3997,
+        0.2266, 0.1704, 0.1524, 0.0950, 0.4221, 0.0051, 0.0591, 0.2573, 0.0432,
+        0.0992, 0.2094, 0.6000, 0.2111, 0.1154, 0.2934, 0.3930, 0.2193, 0.2899,
+        0.0063, 0.2492, 0.3504, 0.1974, 0.1710, 0.0926, 0.0371, 0.3771, 0.5504,
+        0.1937, 0.3583, 0.5605, 0.2913, 0.0567, 0.1487, 0.1044, 0.1778, 0.0186,
+        0.3625, 0.0023, 0.3489, 0.2598, 0.4433, 0.1623, 0.1516, 0.0872, 0.3048,
+        0.1895, 0.6487, 0.2070, 0.3548, 0.2793, 0.0756, 0.3838, 0.2343, 0.4318,
+        0.1029, 0.4382, 0.3752, 0.1512, 0.3434, 0.4145, 0.0261, 0.3143, 0.3880,
+        0.1645, 0.0972, 0.3850, 0.2349, 0.2532, 0.0714, 0.1847, 0.4694, 0.4447,
+        0.2916, 0.0616, 0.0748, 0.4691, 0.1496, 0.1936, 0.3151, 0.0655, 0.0954,
+        0.4632, 0.1923, 0.1978, 0.1169, 0.1182, 0.7000, 0.1005, 0.1190, 0.2258,
+        0.3179, 0.0434, 0.2941, 0.2444, 0.3773, 0.2600, 0.1671, 0.5130, 0.1909,
+        0.3092, 0.2105, 0.2643, 0.1730, 0.0248, 0.1216, 0.2092, 0.1591, 0.1810,
+        0.3249, 0.0399, 0.2929, 0.0741, 0.0688, 0.2930, 0.5038, 0.1000, 0.1618,
+        0.5649, 0.4888, 0.3071, 0.2001, 0.2823, 0.1043, 0.4661, 0.1936, 0.1328,
+        0.5923, 0.1489, 0.6320, 0.1740, 0.2161, 0.1234, 0.2678, 0.0888, 0.5592,
+        0.5433, 0.2965, 0.3451, 0.0881, 0.3278, 0.1593, 0.3041, 0.0903, 0.6649,
+        0.0882, 0.2605, 0.1684, 0.0275, 0.3241, 0.1779, 0.3146, 0.1728, 0.1203,
+        0.1236, 0.0444, 0.1362, 0.2765, 0.1976, 0.2353, 0.1871, 0.1329, 0.1265,
+        0.5969, 0.2508, 0.0920, 0.0131, 0.2281, 0.1600, 0.4332, 0.3579, 0.1761,
+        0.1001, 0.1750, 0.0930, 0.1389, 0.4175, 0.1276, 1.3754, 1.5592, 0.3921,
+        0.1615, 0.3723, 0.1860, 0.0159, 0.8638, 0.7404, 0.0917, 1.1428, 0.1075,
+        0.1122, 0.1042, 0.0237, 0.1988, 0.1258, 0.1197, 0.2525, 0.1948, 0.6208,
+        0.1017, 0.4094, 0.0686, 0.3821, 0.2028, 0.1167, 0.9050, 0.3113, 0.0268,
+        0.0707, 0.3087, 0.3702, 0.1487, 0.0218, 0.1880, 0.1825, 0.0748, 0.1853,
+        0.1567, 0.1246, 0.0623, 0.0864, 0.3296, 0.0624, 0.2576, 0.0314, 0.1901,
+        0.8994, 0.1828, 0.2818, 0.0986, 0.2173, 0.4328, 0.2622, 0.2726, 0.1797,
+        0.3694, 0.2115, 0.3628, 0.1009, 0.0622, 0.5662, 0.0822, 0.1335, 0.0522,
+        0.4087, 0.1361, 0.1355, 0.2106, 0.1094, 0.1202, 0.0683, 0.0779, 0.1499,
+        0.4143, 0.1162, 0.0830, 0.3379, 0.2604, 0.1370, 0.0127, 0.2035, 0.0074,
+        0.0763, 0.0127, 0.3725, 0.4699, 0.3170, 0.0764, 0.1807, 0.1062, 0.3144,
+        0.1376, 0.1702, 0.1220, 0.4983, 0.0632, 0.1623, 0.1065, 0.7297, 0.2602,
+        0.3364, 0.2020, 0.9879, 0.1066, 0.1085, 0.2179, 0.2538, 0.5069, 0.3034,
+        0.1178, 0.6789, 0.3680, 0.7152, 0.0981, 0.1296, 0.3380, 0.1942, 0.3453,
+        0.1606, 0.2748, 0.2738, 0.4135, 0.4349, 0.8237, 0.3847, 0.1343, 0.0667,
+        0.1710, 0.1282, 0.3719, 0.4881, 0.1038, 0.0637, 0.1244, 1.4855, 0.1266,
+        0.2390, 0.1750, 0.0833, 0.2014, 0.1649, 0.5773, 0.2766, 0.1092, 0.1950,
+        0.7463, 0.1273, 0.1812, 0.1976, 0.6087, 0.1492, 0.0450, 0.1874])
 
     def filepath(self):
         return self.file_names
@@ -379,8 +724,125 @@ class TCGAProstate(Dataset):
             data = self.transforms(data)
 
         data.patch_idx = torch.tensor([idx])
-        data.x = torch.cat([data.x, data.pos], dim=1)
-        data.x = (data.x - self.mean) / self.std
+        #data.x = (data.x - self.mean) / self.std
+        #data.x = data.x.float()
+
+        data.x = self.normalize(data.x).float()
+
+
+        data.x[torch.isnan(data.x)] = 0
+        data.x[torch.isinf(data.x)] = 0
+
+        return data
+
+    def normalize(self, x):
+        #[10, -3]   # max 11, min -5
+        diff = self.max - self.min
+        x = x - self.min  # larger than 0
+        x = x / diff  # normalize to 0 - 1
+        #x += self.max
+        mean = (self.mean - self.min) / diff # normlized mean
+        std = (self.std - self.min) / diff  # normalized std
+
+        return (x - mean) / std
+
+class CRC(Dataset):
+    def __init__(self, root, cv, data_set, transforms=None):
+        super().__init__(root)
+        cv = 'fold_{}'.format(cv)
+        self.root = root
+        search_path = os.path.join(self.root, '**', '*.pt')
+        self.file_names = []
+        self.idxlist = []
+        for fp in glob.iglob(search_path, recursive=True):
+            if data_set == 'train':
+                if cv not in fp:
+                    self.file_names.append(fp)
+                    self.idxlist.append(os.path.basename(fp))
+            elif data_set == 'test':
+                if cv in fp:
+                    self.file_names.append(fp)
+                    self.idxlist.append(os.path.basename(fp))
+            else:
+                raise ValueError('wrong value')
+
+        self.transforms = transforms
+        #self.mean = torch.tensor(mean)
+        #self.std = torch.tensor(std)
+        #self.coord_mean =
+
+        # min, max of unet vgg
+        self.min = torch.tensor([-0.0199, -0.0183, -0.0149, -0.0160, -0.0201, -0.0251, -0.0141, -0.0180,
+        -0.0119, -0.0061, -0.0116, -0.0071, -0.0183, -0.0280, -0.0183, -0.0271])
+        self.max = torch.tensor([0.0027, 0.0058, 0.0096, 0.0111, 0.0080, 0.0009, 0.0073, 0.0097, 0.0134,
+        0.0152, 0.0121, 0.0116, 0.0087, 0.0087, 0.0079, 0.0082])
+        #self.min = torch.tensor([9.0000e+01, 7.1388e+00, 7.2445e-02, 6.8259e-02, 1.1786e-01, 1.1679e-01,
+        #1.1255e-01, 6.5754e-02, 7.1361e-02, 5.6361e-02, 7.1411e-02, 6.7237e-02,
+        #6.6426e-02, 5.8134e-02, 4.7020e-02, 5.6861e-02])
+        #self.max = torch.tensor([6.1515e+03, 2.6721e+01, 2.7360e-01, 2.0685e-01, 3.4070e-01, 4.1898e-01,
+        #3.9159e-01, 1.2634e-01, 1.4812e-01, 3.1718e-01, 1.9040e-01, 1.3550e-01,
+        #1.8788e-01, 1.6921e-01, 1.6068e-01, 1.3820e-01])
+        self.num_nodes = 3367
+
+    def normalize(self, x):
+        #[10, -3]   # max 11, min -5
+        diff = self.max - self.min
+        x = x - self.min  # larger than 0
+        x = x / diff  # normalize to 0 - 1
+        #x += self.max
+        mean = (self.mean - self.min) / diff # normlized mean
+        std = (self.std - self.min) / diff  # normalized std
+
+        return (x - mean) / std
+
+    def filepath(self):
+        return self.file_names
+
+    def len(self):
+        return len(self.file_names)
+
+    def get(self, idx):
+        fp = self.file_names[idx]
+        data = torch.load(fp)
+        #print(data)
+        #if self.transforms is not None:
+        #    data = self.transforms(data)
+
+        #data.x[torch.isnan(data.x)] = 0
+        #data.x[torch.isinf(data.x)] = 0
+        data.patch_idx = torch.tensor([idx])
+        #print(data.x.mean(), fp, data.x)
+        #print(data.x[torch.isnan(data.x)])
+        #data.x = torch.cat([data.x, data.pos], dim=1)
+        #print(data.x.shape)
+        #print(self.mean)
+        #print(torch.isnan(data.x).sum())
+        #print(torch.isnan(data.x))
+        #print(data.x.mean())
+        #print(data.x.max(), data.x.min(), 'befre', idx)
+        #data.x = (data.x - self.mean[:16]) / self.std[:16]
+        #data.x = (data.x - self.mean) / self.std
+
+        #####################
+        #imagenet pretrain
+        #mean = torch.tensor((1792.9, 1782.7))
+        #std = torch.tensor((1.0348e+03, 1.0332e+03))
+        #data.x = data.x - 0.4
+        #data.pos = (data.pos - mean) / std
+        #data.x = torch.cat([data.x, data.pos], dim=1)
+        ##########################
+        #data.x = data.x.float()
+        data.path = fp
+        data.x = self.normalize(data.x).float()
+        #print(data.x.max(), data.x.min())
+
+        #print(self.mean, self.std)
+        #print(data.x)
+        #print(data.x, 'before')
+        #data.x = (data.x - self.mean) / self.std
+        #print(data.x.max(), data.x.min(), 'after', idx)
+        #print(data.x)
+        #print(data, data.y)
 
         return data
 

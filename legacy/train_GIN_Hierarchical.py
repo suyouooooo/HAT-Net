@@ -267,6 +267,8 @@ def cell_graph(args, writer = None):
     # val==test loader since we do cross-val
 
     train_loader, val_loader, test_loader = prepare_train_val_loader(args)
+    print(train_loader.dataset)
+    import sys; sys.exit()
     setting = DataSetting()
     input_dim = args.input_feature_dim
     if args.task == 'CRC':

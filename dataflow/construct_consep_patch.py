@@ -77,6 +77,15 @@ def get_mask(type_map, cls_id):
 
 def extract_nuclei(root_path, save_path, patch_size, img_type, image_set):
 
+    #classes = {
+    #        1 : 0,
+    #        2 : 1,
+    #        3 : 2,
+    #        4 : 2,
+    #        5 : 3,
+    #        6 : 3,
+    #        7 : 3
+    #}
     classes = {
             1 : 0,
             2 : 1,
@@ -85,7 +94,6 @@ def extract_nuclei(root_path, save_path, patch_size, img_type, image_set):
             5 : 3,
             6 : 3,
             7 : 3
-    }
     for idx, i in enumerate(glob.iglob(os.path.join(CoNSep_PATH, image_set, 'Labels', '*.mat'))):
         label = io.loadmat(i)
         inst_centroid = label['inst_centroid']

@@ -9,13 +9,20 @@ import pickle
 import glob
 import string
 import time
-#sys.path.append('../')
+import cv2
+
 sys.path.append(os.getcwd())
+from skimage.filters.rank import entropy as Entropy
+from skimage.morphology import disk
+from common.nuc_feature import nuc_stats_new,nuc_glcm_stats_new
+
+
+#sys.path.append('../')
 
 import lmdb
 import torch
 from torch.utils.data import DataLoader, Dataset
-from torch.nn.functional import adaptive_avg_pool3d
+from torch.nn.functional import adaptive_avg_pool3d, adaptive_avg_pool2d
 from torchvision import transforms
 #from torch_geometric.data import Data
 #from torch_geometric.nn import radius_graph
@@ -70,7 +77,144 @@ class MaskJson(Mask):
 #        transforms.Normalize(mean, std),
 #    ])
 
-class Patches:
+class PatchesCombined:
+    def __init__(self, image, coords, bboxes, patch_size):
+        """
+            bboxes :bbox [min_y, min_x, max_y, max_x]
+            coords: (row, col)
+        """
+
+        from model.cpc import get_transforms
+        self.image = image
+        self.bboxes = bboxes
+        self.patch_size = patch_size
+        self.coords = coords
+        #from model.cpc import network
+        self.transforms = get_transforms()
+        #mean = (0.7862793912386359, 0.6027306811087783, 0.7336620786688793) #bgr
+        #std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
+        #mean = [0.73646324, 0.56556627, 0.70180897] # Expanuke bgr
+        #self.std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
+        #std = [0.18869222, 0.21968669, 0.17277594] # Expanuke bgr
+
+
+    #def entory(self, gray_image, d):
+    #    return Entropy(gray_image, d)
+
+    def extract_func(self, image, mask):
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        mask[mask > 0] = 1
+        binary_mask = mask
+
+        entropy = Entropy(gray_image, disk(3))
+        mean_im_out, diff, var_im, skew_im = nuc_stats_new(binary_mask, gray_image)
+        glcm_feat = nuc_glcm_stats_new(binary_mask, gray_image) # just breakline for better code
+        glcm_contrast, glcm_dissimilarity, glcm_homogeneity, glcm_energy, glcm_ASM = glcm_feat
+        mean_ent = cv2.mean(entropy, mask=gray_image)[0]
+        info = cv2.findContours(binary_mask.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        cnt = info[0][0]
+        num_vertices = len(cnt)
+        area = cv2.contourArea(cnt)
+        hull = cv2.convexHull(cnt)
+        hull_area = cv2.contourArea(hull)
+        if hull_area == 0:
+            hull_area += 1
+        solidity = float(area)/hull_area
+        if num_vertices > 4:
+            centre, axes, orientation = cv2.fitEllipse(cnt)
+            majoraxis_length = max(axes)
+            minoraxis_length = min(axes)
+        else:
+            orientation = 0
+            majoraxis_length = 1
+            minoraxis_length = 1
+        perimeter = cv2.arcLength(cnt, True)
+        eccentricity = np.sqrt(1-(minoraxis_length/majoraxis_length)**2)
+
+
+        nuc_feats = []
+        #nuc_feats.append(mean_im_out)
+        nuc_feats.append(diff)
+        nuc_feats.append(var_im)
+        nuc_feats.append(skew_im)
+        nuc_feats.append(mean_ent)
+        nuc_feats.append(glcm_dissimilarity)
+        nuc_feats.append(glcm_homogeneity)
+        nuc_feats.append(glcm_energy)
+        nuc_feats.append(glcm_ASM)
+        nuc_feats.append(eccentricity)
+        nuc_feats.append(area)
+        nuc_feats.append(majoraxis_length)
+        #nuc_feats.append(minoraxis_length) #
+        nuc_feats.append(perimeter)
+        #nuc_feats.append(solidity)
+        #nuc_feats.append(orientation) #
+        #nuc_feats = np.array(nuc_feats)
+
+        #print(nuc_feats.shape)
+
+        return nuc_feats
+
+    def __len__(self):
+        return len(self.bboxes)
+
+    def __getitem__(self, idx):
+        bbox = self.bboxes[idx]
+        #print(bbox, idx)
+        #bbox = self.pad_patch(*bbox, self.patch_size)
+        patch = self.image[bbox[0]: bbox[2]+1, bbox[1]:bbox[3]+1]
+        image = patch[:, :, :3]
+        mask = patch[:, :, 3:]
+        coord = self.coords[idx]
+        hand_features = self.extract_func(image, mask[:, :, 0])
+        #hand_features = self.extract_func(image, mask)
+        #print(hand_features.shape, 11)
+        #print(coord.shape, 22)
+        #hand_features = torch.cat([self.extract_func(image, mask[:, :, 0])])
+        coord.extend(hand_features)
+        hand_features_and_coord = np.array(coord)
+        #print(hand_features_and_coord.shape, hand_features_and_coord.sum())
+
+        bbox = self.pad_patch(*bbox, self.patch_size)
+        #print(bbox[2] - bbox[0], bbox[3] - bbox[1], self.patch_size, bbox)
+        #print(image.shape, 1111111111)
+        patch = self.image[bbox[0]: bbox[2]+1, bbox[1]:bbox[3]+1][:, :, :3]
+        top = max(int((patch.shape[0] - 64) / 2), 0)
+        bottom = max(0, top - patch.shape[0])
+        right = max(int((patch.shape[1] - 64) / 2), 0)
+        left = max(0, right - patch.shape[1])
+        #print(top, bottom, left, right)
+        #print('before pad', patch.shape)
+        patch = cv2.copyMakeBorder(patch, top, bottom, left, right, cv2.BORDER_REFLECT)
+        #print('after pad', patch.shape)
+        #print(image.shape)
+        patch = self.transforms(patch)
+        #print(patch.shape)
+
+        #print(patch.shape)
+        return patch, hand_features_and_coord
+        #patch = self.transforms(patch)
+        #return patch, np.array(self.coords[idx])
+
+    def pad_patch(self, min_x, min_y, max_x, max_y, output_size):
+        width = max_x - min_x
+        height = max_y - min_y
+
+        if width < output_size:
+            w_diff_left = (output_size - width) // 2
+            w_diff_right = output_size - width - w_diff_left
+            min_x = max(0, min_x - w_diff_left)
+            max_x = max_x + w_diff_right
+        if height < output_size:
+            h_diff_top = (output_size - height) // 2
+            h_diff_bot = output_size - height - h_diff_top
+            min_y = max(0, min_y - h_diff_top)
+            max_y = max_y + h_diff_bot
+
+        return min_x, min_y, max_x, max_y
+
+
+class PatchesHandCrafted:
     def __init__(self, image, coords, bboxes, patch_size):
         """
             bboxes :bbox [min_y, min_x, max_y, max_x]
@@ -83,20 +227,143 @@ class Patches:
         self.coords = coords
         #mean = (0.7862793912386359, 0.6027306811087783, 0.7336620786688793) #bgr
         #std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
-        mean = [0.73646324, 0.56556627, 0.70180897] # Expanuke bgr
+        #mean = [0.73646324, 0.56556627, 0.70180897] # Expanuke bgr
         #self.std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
-        std = [0.18869222, 0.21968669, 0.17277594] # Expanuke bgr
+        #std = [0.18869222, 0.21968669, 0.17277594] # Expanuke bgr
+
+
+        #self.transforms = transforms.Compose([
+        #    transforms.ToPILImage(),
+        #    transforms.RandomChoice([
+        #        transforms.RandomResizedCrop(patch_size, scale=(0.9, 1.1)),
+        #        transforms.Resize((patch_size, patch_size))
+        #    ]),
+        #    transforms.RandomApply(torch.nn.ModuleList([
+        #            transforms.ColorJitter(0.2, 0.2, 0.2, 0.2)
+        #    ]), p=0.3),
+        #    transforms.ToTensor(),
+        #    transforms.Normalize(mean, std),
+        #])
+
+    #def entory(self, gray_image, d):
+    #    return Entropy(gray_image, d)
+
+    def extract_func(self, image, mask):
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        mask[mask > 0]= 1
+        binary_mask = mask
+
+        entropy = Entropy(gray_image, disk(3))
+        mean_im_out, diff, var_im, skew_im = nuc_stats_new(binary_mask, gray_image)
+        glcm_feat = nuc_glcm_stats_new(binary_mask, gray_image) # just breakline for better code
+        glcm_contrast, glcm_dissimilarity, glcm_homogeneity, glcm_energy, glcm_ASM = glcm_feat
+        mean_ent = cv2.mean(entropy, mask=gray_image)[0]
+        info = cv2.findContours(binary_mask.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        cnt = info[0][0]
+        num_vertices = len(cnt)
+        area = cv2.contourArea(cnt)
+        hull = cv2.convexHull(cnt)
+        hull_area = cv2.contourArea(hull)
+        if hull_area == 0:
+            hull_area += 1
+        solidity = float(area)/hull_area
+        if num_vertices > 4:
+            centre, axes, orientation = cv2.fitEllipse(cnt)
+            majoraxis_length = max(axes)
+            minoraxis_length = min(axes)
+        else:
+            orientation = 0
+            majoraxis_length = 1
+            minoraxis_length = 1
+        perimeter = cv2.arcLength(cnt, True)
+        eccentricity = np.sqrt(1-(minoraxis_length/majoraxis_length)**2)
+
+
+        nuc_feats = []
+        nuc_feats.append(mean_im_out)
+        nuc_feats.append(diff)
+        nuc_feats.append(var_im)
+        nuc_feats.append(skew_im)
+        nuc_feats.append(mean_ent)
+        nuc_feats.append(glcm_dissimilarity)
+        nuc_feats.append(glcm_homogeneity)
+        nuc_feats.append(glcm_energy)
+        nuc_feats.append(glcm_ASM)
+        nuc_feats.append(eccentricity)
+        nuc_feats.append(area)
+        nuc_feats.append(majoraxis_length) # nan
+        nuc_feats.append(minoraxis_length)
+        nuc_feats.append(perimeter)  # nan
+        nuc_feats.append(solidity) # nan
+        nuc_feats.append(orientation)
+        nuc_feats = np.array(nuc_feats)
+
+        #print(nuc_feats.shape)
+
+        return nuc_feats
+
+    def __len__(self):
+        return len(self.bboxes)
+
+    def __getitem__(self, idx):
+        bbox = self.bboxes[idx]
+        #print(bbox, idx)
+        #bbox = self.pad_patch(*bbox, self.patch_size)
+        patch = self.image[bbox[0]: bbox[2]+1, bbox[1]:bbox[3]+1]
+        image = patch[:, :, :3]
+        mask = patch[:, :, 3:]
+        features = self.extract_func(image, mask[:, :, 0])
+        #patch = self.transforms(patch)
+        return features, np.array(self.coords[idx])
+
+    def pad_patch(self, min_x, min_y, max_x, max_y, output_size):
+        width = max_x - min_x
+        height = max_y - min_y
+
+        if width < output_size:
+            w_diff_left = (output_size - width) // 2
+            w_diff_right = output_size - width - w_diff_left
+            min_x = max(0, min_x - w_diff_left)
+            max_x = max_x + w_diff_right
+        if height < output_size:
+            h_diff_top = (output_size - height) // 2
+            h_diff_bot = output_size - height - h_diff_top
+            min_y = max(0, min_y - h_diff_top)
+            max_y = max_y + h_diff_bot
+
+        return min_x, min_y, max_x, max_y
+
+class Patches:
+    def __init__(self, image, coords, bboxes, patch_size):
+        """
+            bboxes :bbox [min_y, min_x, max_y, max_x]
+            coords: (row, col)
+        """
+
+        self.image = image
+        self.bboxes = bboxes
+        self.patch_size = patch_size
+        self.coords = coords
+        #mean = (0.7862793912386359, 0.6027306811087783, 0.7336620786688793) #bgr consep
+        #std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
+        #mean = [0.73646324, 0.56556627, 0.70180897] # Expanuke bgr
+        #std = [0.18869222, 0.21968669, 0.17277594] # Expanuke bgr
+
+        #self.std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
+        #self.std = [0.18869222, 0.21968669, 0.17277594] # Expanuke bgr
+        mean = [0.72369437, 0.44910724, 0.68094617] # prostate bgr
+        std = [0.17274064, 0.20472058, 0.20758244] # prosate bgr
 
 
         self.transforms = transforms.Compose([
             transforms.ToPILImage(),
             transforms.RandomChoice([
-                transforms.RandomResizedCrop(patch_size, scale=(0.9, 1.1)),
+                #transforms.RandomResizedCrop(patch_size, scale=(0.9, 1.1)),
                 transforms.Resize((patch_size, patch_size))
             ]),
-            transforms.RandomApply(torch.nn.ModuleList([
-                    transforms.ColorJitter(0.2, 0.2, 0.2, 0.2)
-            ]), p=0.3),
+            #transforms.RandomApply(torch.nn.ModuleList([
+            #        transforms.ColorJitter(0.2, 0.2, 0.2, 0.2)
+            #]), p=0.3),
             transforms.ToTensor(),
             transforms.Normalize(mean, std),
         ])
@@ -145,24 +412,42 @@ def network(network_name, num_classes, pretrained):
         raise ValueError('network names not suppored')
     return net
 
-#### generating features
-class ExtractorResNet50:
-    def __init__(self, path):
-        self.net = network('resnet50',  5, False)
-        print('loading weight file {}...'.format(path))
-        self.net.load_state_dict(torch.load(path))
-        print('Done.')
+class ExtractorResNet50ImageNet:
+    def __init__(self):
+        self.net = network('resnet50',  5, True)
         self.net = self.net.cuda()
+        print(torch.cuda.device_count())
+        self.net = torch.nn.DataParallel(self.net)
 
     def __call__(self, images):
         with torch.no_grad():
             output = self.net(images.cuda())
-            print(output.shape)
-            #output = output.unsqueeze(0)
-            #output = adaptive_avg_pool3d(output, (512, 1, 1))
-            #output = output.squeeze()
-        #return output.cpu().numpy()
-        return output.cpu()
+            output = output.unsqueeze(0)
+            output = adaptive_avg_pool3d(output, (16, 1, 1))
+            output = output.squeeze()
+
+        return output.cpu().numpy()
+
+#### generating features
+class ExtractorResNet50:
+    def __init__(self, path):
+        #self.net = network('resnet50',  5, False)
+        self.net = network('resnet50', 6, False)
+        self.net = self.net.cuda()
+        self.net = torch.nn.DataParallel(self.net)
+        print('loading weight file {}...'.format(path))
+        self.net.load_state_dict(torch.load(path))
+        print('Done.')
+
+    def __call__(self, images):
+        with torch.no_grad():
+            output = self.net(images.cuda())
+            output = output.unsqueeze(0)
+            output = adaptive_avg_pool3d(output, (512, 1, 1))
+            output = output.squeeze()
+
+        return output.cpu().numpy()
+        #return output.cpu()
 
 #def extractor_resnet(images, mask=None):
     #net = network('resnet50',  4, False)
@@ -284,75 +569,11 @@ def extract_node_features_resnet(image, bboxes, coords, patch_size, batch_size, 
     return node_features, node_coords
 
 
-#def extract_node_features_resnet(image, bboxes, coords, patch_size, batch_size, extractor):
-#    import time
-#    start = time.time()
-#    dataset = Patches(image, coords, bboxes, patch_size)
-#    data_loader = DataLoader(dataset, num_workers=4, batch_size=batch_size, shuffle=False)
-#
-#    node_features = []
-#    node_coords = []
-#    #with torch.no_grad():
-#    with torch.no_grad():
-#        #for images, coords in data_loader:
-#        images = []
-#        #coords = []
-#        count = 0
-#        for image, coord in dataset:
-#            images.append(image)
-#            node_coords.append(coord)
-#
-#
-#            #node_features = net(images)
-#            count += 1
-#            if count == batch_size:
-#                images = torch.stack(images)
-#                output = extractor(images)
-#                output = output.unsqueeze(0)
-#                output = adaptive_avg_pool3d(output, (16, 1, 1))
-#                output = output.squeeze()
-#
-#                node_features.append(output.cpu().numpy())
-#
-#                #node_coords.append(coords.numpy())
-#                images = []
-#                count = 0
-#
-#
-#        if images:
-#                #images
-#                images = torch.stack(images)
-#                output = extractor(images)
-#                output = output.unsqueeze(0)
-#                output = adaptive_avg_pool3d(output, (16, 1, 1))
-#                output = output.squeeze()
-#
-#                node_features.append(output.cpu().numpy())
-#
-#                #node_coords.append(coords.numpy())
-#
-#        if node_features:
-#            node_features = np.vstack(node_features)
-#        else:
-#            node_features = np.array(node_features)
-#
-#        if node_coords:
-#            node_coords = np.vstack(node_coords)
-#        else:
-#            node_coords = np.array(node_coords)
-#
-#        assert len(node_coords) == len(node_features)
-#
-#    finish = time.time()
-#    print(finish - start)
-#    return node_features, node_coords
-
-
 def extract_node_features_hand_crafted(image, bboxes, patch_size, batch_size, extractor):
     pass
 
 class ImageNumpy:
-    def __init__(self, image_folder, label_folder, image_size, return_mask=False):
+    def __init__(self, image_folder, label_folder, return_mask=False):
         self.image_folder = image_folder
         self.label_folder = label_folder
         self.image_names = []
@@ -363,6 +584,7 @@ class ImageNumpy:
                 continue
             self.image_names.append(image_name)
 
+        print(len(self.image_names))
     def __len__(self):
         return len(self.image_names)
 
@@ -388,12 +610,267 @@ class ImageNumpy:
 
         rel_image_path = str(Path(image_path).relative_to(self.image_folder))
         if self.return_mask:
-            return image, rel_image_path, bboxes, coords, mask
+            #return image, rel_image_path, bboxes, coords, mask
+            return rel_image_path, np.concatenate((image, mask), axis=2), bboxes, coords
+            #return np.rel_image_path, image, bboxes, coords, mask
         else:
-            return image, rel_image_path, bboxes, coords, None
+            return rel_image_path, image, bboxes, coords
+
+class Prosate5CropsAugCPC:
+    def __init__(self, image_folder, json_folder, return_mask=True):
+        self.image2path = {}
+        self.json2path = {}
+        #search_path = os.path.join(image_folder, '**', '*.jpg')
+        search_path = os.path.join(image_folder, '**', '*.png')
+        for image_fp in glob.iglob(search_path, recursive=True):
+            image_name = os.path.basename(image_fp)
+            self.image2path[image_name] = image_fp
+
+        search_path = os.path.join(json_folder, '**', '*.json')
+        for json_fp in glob.iglob(search_path, recursive=True):
+            json_name = os.path.basename(json_fp)
+            self.json2path[json_name] = json_fp
+
+        self.image_names = list(self.image2path.keys())
+
+        self.return_mask = return_mask
+        self.scale = 1
+
+        #self.image2label = self.read_csv(csv_file)
+
+        #self.image_names = []
+        #for key in self.image2label.keys():
+        #    self.image_names.append(key)
+
+
+#    def read_csv(self, csv_file):
+#        res = {}
+#        with open(csv_file, newline='') as csvfile:
+#            reader = csv.DictReader(csvfile)
+#            for row in reader:
+#                gs = int(row['gleason score'])
+#                if gs <= 6:
+#                   res[row['image name']] = 1
+#                else:
+#                   res[row['image name']] = 2
+#        return res
+
+    def __len__(self):
+        return len(self.image2path.keys())
+
+    def read_file(self, json_path):
+        res = []
+        with open(json_path, 'r') as f:
+            json_data = json.load(f)
+            #print(res.keys())
+            #print(res['nuc']['2175'])
+            #print(len(res['nuc'].keys()))
+            for k, v in json_data['nuc'].items():
+                #print(type(v))
+                #print(v.keys())
+                res.append(v)
+        return res
+
+    def format_labels(self, labels):
+        coords = []
+        bboxes = []
+        if self.return_mask:
+            mask = np.zeros((self.image_size * self.scale, self.image_size * self.scale), dtype='uint8')
+
+        type_probs = []
+        for node in labels:
+            cen = node['centroid']
+            cen = [int(c) for c in cen]
+            cen = cen[::-1]
+            coords.append(cen)
+            #image = cv2.circle(image, tuple(cen), 3, (0, 200, 0), cv2.FILLED, 1)
+            # node['bbox'] : [[rmin, cmin], [rmax, cmax]]
+            bbox = node['bbox']
+            #print(node['type_prob'])
+            # bbox : [min_y, min_x, max_y, max_x]
+            #bbox = [b // 2 for b in sum(bbox, [])]
+            bbox = [b for b in sum(bbox, [])]
+            bboxes.append(bbox)
+
+            #contour = node['contour']
+            #node['contour'] = [[c1 // 2, c2 // 2] for [c1, c2] in contour]
+            #type_probs.append(node['type_prob'])
+
+            if self.return_mask:
+                #cv2.imwrite('heihei_del1.png', image)
+                cv2.drawContours(mask, [np.array(node['contour'])], -1, 255, -1)
+                #cv2.imwrite('heihei_del.png', image)
+                #cv2.imwrite()
+
+        if self.return_mask:
+            #return bboxes, coords, mask, type_probs
+            return bboxes, coords, mask
+        else:
+            #return bboxes, coords, None, type_probs
+            return bboxes, coords, None
+
+    def __getitem__(self, idx):
+        image_name = self.image_names[idx]
+        image_fp = self.image2path[image_name]
+        image = cv2.imread(image_fp, -1)
+        self.image_size = image.shape[0]
+
+        #json_fp = self.json2path[image_name.replace('.jpg', '.json')]
+        json_fp = self.json2path[image_name.replace('.png', '.json')]
+        #print(image_fp, json_fp)
+        #bboxes, coords = self.read_json(json_fp)
+        labels = self.read_file(json_fp)
+        bboxes, coords, mask, type_probs = self.format_labels(labels)
+
+        image_name = os.path.basename(image_fp)
+        #label = self.image2label[image_name]
+        #print(label)
+        #image_name = image_name.replace('.', '_grade_{}.'.format(label))
+        #print(image_name)
+
+        if self.return_mask:
+            #mask = np.unsqueeze(mask, axis=-1)
+            mask = np.expand_dims(mask, axis=-1)
+            #print(mask.shape, image.shape)
+            #return os.path.basename(image_fp), np.concatenate((image, mask), axis=2), bboxes, coords
+            return image_name, np.concatenate((image, mask), axis=2), bboxes, coords
+            #return rel_image_path, np.concatenate((image, mask), axis=2), bboxes, coords
+
+        #return image, rel_image_path, bboxes, coords, mask
+        #return image, rel_image_path, bboxes, coords
+        #return rel_image_path, image, bboxes, coords
+        #image_name = os.path.basename(image_fp)
+        #label = self.image2label[image_name]
+        #image_name = image_name.replace('.', '_grade_{}.'.format(label))
+        #print(image_name)
+        #return os.path.basename(image_fp), image, bboxes, coord
+        return image_name, image, bboxes, coords, type_probs
+
+class Prosate5CropsCPC:
+    def __init__(self, image_folder, json_folder, csv_file, return_mask=True):
+        self.image2path = {}
+        self.json2path = {}
+        search_path = os.path.join(image_folder, '**', '*.jpg')
+        for image_fp in glob.iglob(search_path, recursive=True):
+            image_name = os.path.basename(image_fp)
+            self.image2path[image_name] = image_fp
+
+        search_path = os.path.join(json_folder, '**', '*.json')
+        for json_fp in glob.iglob(search_path, recursive=True):
+            json_name = os.path.basename(json_fp)
+            self.json2path[json_name] = json_fp
+
+        #self.image_names = list(self.image2path.keys())
+
+        self.return_mask = return_mask
+        self.scale = 1
+
+        self.image2label = self.read_csv(csv_file)
+
+        self.image_names = []
+        for key in self.image2label.keys():
+            self.image_names.append(key)
+
+
+    def read_csv(self, csv_file):
+        res = {}
+        with open(csv_file, newline='') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                gs = int(row['gleason score'])
+                if gs <= 6:
+                   res[row['image name']] = 1
+                else:
+                   res[row['image name']] = 2
+        return res
+
+    def __len__(self):
+        return len(self.image2path.keys())
+
+    def read_file(self, json_path):
+        res = []
+        with open(json_path, 'r') as f:
+            json_data = json.load(f)
+            #print(res.keys())
+            #print(res['nuc']['2175'])
+            #print(len(res['nuc'].keys()))
+            for k, v in json_data['nuc'].items():
+                #print(type(v))
+                #print(v.keys())
+                res.append(v)
+        return res
+
+    def format_labels(self, labels):
+        coords = []
+        bboxes = []
+        if self.return_mask:
+            mask = np.zeros((self.image_size * self.scale, self.image_size * self.scale), dtype='uint8')
+
+        for node in labels:
+            cen = node['centroid']
+            cen = [int(c) for c in cen]
+            cen = cen[::-1]
+            coords.append(cen)
+            #image = cv2.circle(image, tuple(cen), 3, (0, 200, 0), cv2.FILLED, 1)
+            # node['bbox'] : [[rmin, cmin], [rmax, cmax]]
+            bbox = node['bbox']
+            # bbox : [min_y, min_x, max_y, max_x]
+            #bbox = [b // 2 for b in sum(bbox, [])]
+            bbox = [b for b in sum(bbox, [])]
+            bboxes.append(bbox)
+
+            #contour = node['contour']
+            #node['contour'] = [[c1 // 2, c2 // 2] for [c1, c2] in contour]
+
+            if self.return_mask:
+                #cv2.imwrite('heihei_del1.png', image)
+                cv2.drawContours(mask, [np.array(node['contour'])], -1, 255, -1)
+                #cv2.imwrite('heihei_del.png', image)
+                #cv2.imwrite()
+
+        if self.return_mask:
+            return bboxes, coords, mask
+        else:
+            return bboxes, coords, None
+
+    def __getitem__(self, idx):
+        image_name = self.image_names[idx]
+        image_fp = self.image2path[image_name]
+        image = cv2.imread(image_fp, -1)
+        self.image_size = image.shape[0]
+
+        json_fp = self.json2path[image_name.replace('.jpg', '.json')]
+        #print(image_fp, json_fp)
+        #bboxes, coords = self.read_json(json_fp)
+        labels = self.read_file(json_fp)
+        bboxes, coords, mask = self.format_labels(labels)
+
+        image_name = os.path.basename(image_fp)
+        label = self.image2label[image_name]
+        #print(label)
+        image_name = image_name.replace('.', '_grade_{}.'.format(label))
+        #print(image_name)
+
+        if self.return_mask:
+            #mask = np.unsqueeze(mask, axis=-1)
+            mask = np.expand_dims(mask, axis=-1)
+            #print(mask.shape, image.shape)
+            #return os.path.basename(image_fp), np.concatenate((image, mask), axis=2), bboxes, coords
+            return image_name, np.concatenate((image, mask), axis=2), bboxes, coords
+            #return rel_image_path, np.concatenate((image, mask), axis=2), bboxes, coords
+
+        #return image, rel_image_path, bboxes, coords, mask
+        #return image, rel_image_path, bboxes, coords
+        #return rel_image_path, image, bboxes, coords
+        #image_name = os.path.basename(image_fp)
+        #label = self.image2label[image_name]
+        #image_name = image_name.replace('.', '_grade_{}.'.format(label))
+        #print(image_name)
+        #return os.path.basename(image_fp), image, bboxes, coord
+        return image_name, image, bboxes, coord
 
 class ImageJson:
-    def __init__(self, image_folder, label_folder, image_size, return_mask=False):
+    def __init__(self, image_folder, label_folder, image_size, return_mask=False, scale=2):
         self.image_folder = image_folder
         self.image_size = image_size
         self.label_folder = label_folder
@@ -403,6 +880,7 @@ class ImageJson:
         self.image_dataset = ImageDataset(image_list, image_size)
         self.image_lists = self.image_dataset.file_path_lists
         self.return_mask = return_mask
+        self.scale = 2
         #self.json_lists = self.json_dataset.file_path_lists
         #self.transform = transform
 
@@ -416,7 +894,7 @@ class ImageJson:
         image_path = Path(image_path)
         rel_image_path = str(image_path.relative_to(self.image_folder))
         image = self.image_dataset.get_file_by_path(str(image_path))
-        image = cv2.resize(image, (0,0), fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
+        image = cv2.resize(image, (0,0), fx=self.scale, fy=self.scale, interpolation=cv2.INTER_LINEAR)
         json_path = self.image2json_fp(image_path)
         labels = self.json_dataset.get_file_by_path(json_path)
         #print(type(labels))
@@ -428,12 +906,21 @@ class ImageJson:
         image_path = Path(self.image_lists[idx])
         rel_image_path = str(image_path.relative_to(self.image_folder))
         image = self.image_dataset.get_file_by_path(str(image_path))
-        image = cv2.resize(image, (0,0), fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
+        image = cv2.resize(image, (0,0), fx=self.scale, fy=self.scale, interpolation=cv2.INTER_LINEAR)
         json_path = self.image2json_fp(image_path)
         labels = self.json_dataset.get_file_by_path(json_path)
         #print(type(labels))
         bboxes, coords, mask = self.format_labels(labels)
-        return image, rel_image_path, bboxes, coords, mask
+
+        if self.return_mask:
+            #mask = np.unsqueeze(mask, axis=-1)
+            mask = np.expand_dims(mask, axis=-1)
+            #print(mask.shape, image.shape)
+            return rel_image_path, np.concatenate((image, mask), axis=2), bboxes, coords
+
+        #return image, rel_image_path, bboxes, coords, mask
+        #return image, rel_image_path, bboxes, coords
+        return rel_image_path, image, bboxes, coords
 
     def __len__(self):
         assert len(self.image_dataset) == len(self.json_dataset)
@@ -448,7 +935,7 @@ class ImageJson:
         coords = []
         bboxes = []
         if self.return_mask:
-            mask = np.zeros((self.image_size, self.image_size), dtype='uint8')
+            mask = np.zeros((self.image_size * self.scale, self.image_size * self.scale), dtype='uint8')
 
         #print(labels.keys())
         for node in labels:
@@ -733,7 +1220,6 @@ def gen_training_data(conf):
             #print(k, v.shape)
 
 
-    sys.exit()
 
 
     #for coord in node_coords:
@@ -839,7 +1325,13 @@ class TorchWriter:
             name, val = pair
             name = name.split('.')[0] + '.pt'
             save_path = os.path.join(self.save_path, name)
+            #if val['feat'].sum() == 0:
+            #    print(name, val)
             #print(save_path)
+
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            print(save_path)
+            #print(val['feat'].shape)
             torch.save(val, save_path)
 
 
@@ -852,27 +1344,6 @@ class FeatLMDBWriter:
         with self.env.begin(write=True) as txn:
             for pair in pairs:
                 txn.put(*pair)
-
-    #def __call__(self, key, value, printable=False):
-    #    """key: relative path to image"""
-    #    assert type(key) == str
-    #    assert type(value) == bytes
-
-    #    #image_name = os.path.basename(key)
-    #    dir_name = os.path.dirname(key)
-
-    #    if dir_name not in self.datasets:
-    #        lmdb_path = os.path.join(self.save_path, dir_name)
-    #        os.makedirs(lmdb_path, exist_ok=True)
-    #        env = lmdb.open(lmdb_path, map_size=map_size)
-    #        self.datasets[dir_name] = env
-
-    #    env = self.datasets[dir_name]
-    #    with env.begin(write=True) as txn:
-    #        if printable:
-    #            print('writing files to {}...'.format(
-    #                os.path.join(self.save_path, key)))
-    #        txn.put(key.encode(), value)
 
 class ProsateTest:
     def __init__(self, image_folder, json_folder, csv_file):
@@ -1009,36 +1480,60 @@ def generate_features(dataloader, num_feats, rel_pathes, writer, extractor):
     node_features = []
     node_coords = []
     #wih torch.no_grad():
-    torch.set_printoptions(sci_mode=False)
+    #torch.set_printoptions(sci_mode=False)
 
-    from collections import Counter
-    counter = Counter()
-    count = 0
-    total = 0
-    for images, coords in data_loader:
+    #from collections import Counter
+    #counter = Counter()
+    #count = 0
+    #total = 0
+    for idx, (images, coords) in enumerate(data_loader):
+        #print(images.shape)
         output = extractor(images)
+        #print(output.shape)
 
-        ff = torch.nn.functional.softmax(output, dim=1)
-        ind = torch.argmax(ff, dim=1)
-        #print(ind, ff.max())
-        print(ind.shape)
-        cc = ff.max(dim=1)[0] > 0.5
-        total += len(ff)
-        count += cc.sum()
-        print(count / total)
-        #print(ind)
-        #for i in ind.tolist():
-        counter.update(ind.tolist())
-        print(counter)
-        print('---------------')
+
+
+        # combined
+        #print(output.shape, coords.shape)
+        #output = np.hstack([output, coords[:, 2:]])
+        #coords = coords[:, :2]
+
+
+
+        #print(output.shape, coords.shape, coords)
+        #import sys; sys.exit()
+
+        #ff = torch.nn.functional.softmax(output, dim=1)
+        #ind = torch.argmax(ff, dim=1)
+        ##print(ind, ff.max())
+        #print(ind.shape)
+        #cc = ff.max(dim=1)[0] > 0.5
+        #total += len(ff)
+        #count += cc.sum()
+        #print(count / total, '3333')
+        ##print(ind)
+        ##for i in ind.tolist():
+        #counter.update(ind.tolist())
+        #print(counter)
+        #print('---------------')
         #print(ff, ff.max())
 
         node_features.append(output)
-        node_coords.extend(coords)
+        #node_coords.extend(coords)
+        node_coords.append(coords)
+        #print(output.shape, coords.shape)
+        #print(len(node_features), 'fffff`')
+        #print(len(node_coords), 'cccccc')
+        #print(idx, len(data_loader))
 
-    sys.exit()
+    #sys.exit()
+    #print(len(node_features))
     node_features = np.vstack(node_features)
     node_coords = np.vstack(node_coords)
+    #print(node_features.shape, node_coords.shape, 111111111)
+    assert len(node_features) == len(node_coords)
+    #print(node_features.shape)
+    #print(node_coords.shape)
     prev = 0
     #print('here...........................................')
     #print(len(rel_pathes), len(num_feats))
@@ -1060,248 +1555,240 @@ def generate_features(dataloader, num_feats, rel_pathes, writer, extractor):
         prev += num_feat
         lmdb_pair.append([rel_path, val])
 
+    #import sys; sys.exit()
     writer.add_pair(lmdb_pair)
     #print(count / (time.time() - start))
+
+class ExtractorCPC:
+    def __init__(self):
+        from model.cpc import network
+        #print('loading weight file {}...'.format(path))
+        self.net = network()
+        #path = ''
+        #self.net.load_state_dict(torch.load(path))
+        #print('Done.')
+        self.net = self.net.cuda()
+        self.net = torch.nn.DataParallel(self.net)
+
+    def __call__(self, images):
+        with torch.no_grad():
+            output = self.net(images.cuda())
+            output = output.unsqueeze(0)
+            output = adaptive_avg_pool2d(output, (1, 1))
+            output = output.squeeze()
+
+        return output.cpu().numpy()
+
+
+
+class ExtractHandCrafted:
+    def __init__(self):
+        pass
+
+    def __call__(self, batch):
+        return batch
+
+
 
 
 
 if __name__ == '__main__':
 
+    #dataset = ImageJson('/home/baiyu/Extended_CRC', '/home/baiyu/EXtended_CRC_Mask', 1792)
+
+    #import sys;
+    #dataset = ImageJson('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Images/', '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Json/EXtended_CRC_Mask/', 224, return_mask=True)
+    #print(len(dataset))
+    #import sys; sys.exit()
+    #print(len(dataset))
+    #print(dataset[2][0], dataset[2][1].shape, dataset[2][2], dataset[2][3])
+    #print(dataset[2333][1].shape)
+    #image = dataset[2][1]
+    #import random
+
+    #image = random.choice(dataset)[1]
+    #img = image[:, :, :3]
+    #mask = image[:, :, 3:]
+    #img[mask[:, :, 0] != 0, :] = 0
+    #print(np.unique(mask))
+    ##img = cv2.resize(img, (0, 0), fx=0.2, fy=0.2)
+    #print(img.shape)
+
+    #cv2.imwrite('fff.jpg', img)
+
+
+    #import sys; sys.exit()
     #save_path = ''
     #dataset = ImageJson('/home/baiyu/Extended_CRC', '/home/baiyu/EXtended_CRC_Mask', 1792)
     #image_path = '/home/baiyu/Extended_CRC'
     #json_path = '/home/baiyu/EXtended_CRC_Mask'
     #config = Res50JsonMaskConfig()
-    resnet50_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ResNet50/97-best.pth'
-    image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images'
-    json_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json/'
+    #resnet50_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ResNet50/97-best.pth'
+    resnet50_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ResNet50/81-best.pth'
+    #image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images'
+    #json_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json/'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat/'
     #image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images_Aug/train'
     #json_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json_Aug/train'
+    #image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images_Aug/test'
+    #json_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json_Aug/test'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat_Aug/'
-    save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat_Test'
-    csv_file = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Labels/Gleason_masks_test_pathologist1.csv'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat_Aug/train'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat_Aug/test'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat_Test'
+    #csv_file = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Labels/Gleason_masks_test_pathologist1.csv'
+    #image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images/5Crops'
+    #json_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json/5Crops'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat/5Crops_CPC'
+    image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images/5Crops_Aug/'
+    #json_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json/5Crops_Aug/'
+    json_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json/5Crops_json_withtypes_Aug/'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat/5Crops_Aug_CPC/'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat/ImageNetPretrain'
+    save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat/5Crops_Res50_withtype_Aug'
+    csv_file = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Labels/5Crops.csv'
     epoches = 1
+    #image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/raw/CRC'
+    #json_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/proto/mask/CRC/shaban-cia'
+
+    image_folder = '/data/smb/syh/colon_dataset/CoNSeP/Train/Overlay/'
+    json_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CoNSeP/Json'
 
 
     datasets = []
     num_feats = []
     rel_pathes = []
     extractor = ExtractorResNet50(resnet50_path)
+    #extractor = ExtractHandCrafted()
+    #extractor = ExtractorCPC()
+    #extractor = ExtractorResNet50ImageNet()
     #dataset = Prosate(image_folder, json_folder)
-    dataset = ProsateTest(image_folder, json_folder, csv_file)
+    #dataset = Prosate5CropsCPC(image_folder, json_folder, csv_file)
+    dataset = Prosate5CropsAugCPC(image_folder, json_folder, return_mask=False)
+
+    #import random
+    #np.random.seed(2020)
+    #image_name, image, bboxes, coords, type_probs = random.choice(dataset)
+    #count = 0
+    #for idx, bbox in enumerate(bboxes):
+    #    assert bbox[0] < bbox[2]
+    #    assert bbox[1] < bbox[3]
+    #    if type_probs[idx] < 0.5:
+    #        count += 1
+    #        image = cv2.rectangle(image, tuple(bbox[:2][::-1]), tuple(bbox[2:][::-1]), (0, 9, 100), 2)
+    #    else:
+    #        image = cv2.rectangle(image, tuple(bbox[:2][::-1]), tuple(bbox[2:][::-1]), (0, 255, 0), 2)
+
+    ##for idx, coord in enumerate(coords):
+    ##    image = cv2.circle(image, tuple(coord[::-1]), 3, (0, 200, 0), cv2.FILLED, 1)
+
+    #image = cv2.resize(image, (0, 0), fx=0.4, fy=0.4)
+    #print(count)
+    #cv2.imwrite('fff.jpg', image)
+
+
+
+
+
+
+
+    #import sys; sys.exit()
+    #dataset = ImageNumpy(image_folder, json_folder)
+
+    #path, image, bboxes, coords = dataset[333]
+    #for c in coords:
+    #    image = cv2.circle(image, tuple(c[::-1]), 3, (0, 200, 0), cv2.FILLED, 1)
+
+
+    #image = cv2.resize(image, (0, 0), fx=0.3, fy=0.3)
+    #cv2.imwrite('fff.jpg', image)
+    #print(image.shape)
+    #import sys;sys.exit()
+    ##print(image.shape)
+    #mask = image[:, :, 3:]
+    #image = image[:, :, :3]
+    #image[mask[:, :, 0] != 0, :] = 0
+    #image = cv2.resize(image, (0, 0), fx=0.4, fy=0.4)
+    #cv2.imwrite('fff.jpg', image)
+    #import sys; sys.exit()
+    #dataset = ProsateTest(image_folder, json_folder, csv_file)
     datawriter = TorchWriter
-    #start = time.time()
     count = 0
+    PatchData = Patches
+    #PatchData = PatchesHandCrafted
+    #PatchData = PatchesCombined  # mask needed
+    print(len(dataset))
+    start = time.time()
+    #count = 0
     for rel_path, image, bboxes, coords in dataset:
-        patch_dataset = Patches(image, coords, bboxes, 64)
-        #if len(bboxes) == 0:
-        #    print(rel_path)
-        #    print(len(patch_dataset))
+        #count += 1
+        #if count != 1153:
+            #continue
+
+        #print(rel_path)
+        #print(image.shape)
+        #for c in coords:
+        #    image = cv2.circle(image, tuple(c[::-1]), 3, (0, 200, 0), cv2.FILLED, 1)
+        #for bbox in bboxes:
+        #    if bbox[0] > bbox[2]:
+        #        print(rel_path)
+
+        #    if bbox[1] > bbox[3]:
+        #        print(rel_path)
+
+
+
+        #for bbox in bboxes:
+        #    image = cv2.rectangle(image, tuple(bbox[:2][::-1]), tuple(bbox[2:][::-1]), (255, 0, 0), 3)
+        #image = cv2.resize(image, (0, 0), fx=0.4, fy=0.4)
+        #cv2.imwrite('fff.jpg', image)
+        ## draw nuclei here
+
+        #print(image.shape)
+        #mask = image[:, :, 3:]
+        #print(mask.shape)
+        #image = image[:, :, :3]
+        #image[mask[:, :, 0] != 0, :] = 0
+        #image = cv2.resize(image, (0, 0), fx=0.3, fy=0.3)
+        #cv2.imwrite('fff.jpg', image)
+        #print(rel_path)
+        #import sys; sys.exit()
+        patch_dataset = PatchData(image, coords, bboxes, 71)
         datasets.append(patch_dataset)
-        #print(num_feat, len(patch_dataset))
         num_feats.append(len(patch_dataset))
         rel_pathes.append(rel_path)
 
 
-        #count += sum(num_feats)
         count += 1
-        if count % 1000 == 0:
+        if count % 100 == 0:
+            finish = time.time()
+
+            print('[{}/{}], speed:{}'.format(count, len(dataset), count / (finish - start)))
+            print('dataset size:', len(datasets), sum(num_feats))
 
             datasets = torch.utils.data.ConcatDataset(datasets)
-            data_loader = DataLoader(datasets, num_workers=4, batch_size=3000, shuffle=False)
+            data_loader = DataLoader(datasets, num_workers=4, batch_size=3000 * 3, shuffle=False)
 
             for epoch in range(epoches):
-                lmdb_path_epoch = os.path.join(save_path, str(epoch))
-                os.makedirs(lmdb_path_epoch, exist_ok=True)
-                print('saving data to {}.....'.format(lmdb_path_epoch))
-                writer = datawriter(lmdb_path_epoch)
+                save_path_epoch = os.path.join(save_path, str(epoch))
+                os.makedirs(save_path_epoch, exist_ok=True)
+                print('saving data to {}.....'.format(save_path_epoch))
+                writer = datawriter(save_path_epoch)
                 generate_features(data_loader, num_feats, rel_pathes, writer, extractor)
             datasets = []
             num_feats = []
             rel_pathes = []
 
+    if not datasets:
+        import sys; sys.exit()
+
     datasets = torch.utils.data.ConcatDataset(datasets)
-    data_loader = DataLoader(datasets, num_workers=4, batch_size=3000, shuffle=False)
+    data_loader = DataLoader(datasets, num_workers=4, batch_size=3000 * 3, shuffle=False)
     for epoch in range(epoches):
-        lmdb_path_epoch = os.path.join(save_path, str(epoch))
-        os.makedirs(lmdb_path_epoch, exist_ok=True)
-        print('saving data to {}.....'.format(lmdb_path_epoch))
-        writer = datawriter(lmdb_path_epoch)
+        save_path_epoch = os.path.join(save_path, str(epoch))
+        os.makedirs(save_path_epoch, exist_ok=True)
+        print('saving data to {}.....'.format(save_path_epoch))
+        writer = datawriter(save_path_epoch)
         generate_features(data_loader, num_feats, rel_pathes, writer, extractor)
 
     print(count)
-
-
-
-
-
-
-    #node_features = []
-    #node_coords = []
-    ##wih torch.no_grad():
-    #for images, coords in data_loader:
-    #    output = extractor(images)
-    #    node_features.append(output)
-    #    node_coords.extend(coords)
-
-    #node_features = np.vstack(node_features)
-    #node_coords = np.vstack(node_coords)
-    #prev = 0
-    ##print('here...........................................')
-    ##print(len(rel_pathes), len(num_feats))
-    ##test_cum = 0
-    #lmdb_pair = []
-    #for rel_path, num_feat in zip(rel_pathes, num_feats):
-    #    print(rel_path, num_feat)
-
-    #    sub_feat = node_features[prev : prev+num_feat]
-    #    sub_coord = node_coords[prev : prev+num_feat]
-    #    #print(sub_feat.shape, sub_coord.shape)
-    #    val = {
-    #        'feat' : sub_feat,
-    #        'coord' : sub_coord
-    #    }
-    #    val = pickle.dumps(val)
-    #    rel_path = rel_path.replace('.png', '.npy')
-    #    #print(rel_path, sub_feat.shape, sub_coord.shape)
-    #    prev += num_feat
-    #    lmdb_pair.append([rel_path.encode(), val])
-
-    #lmdb_writer.add_pair(lmdb_pair)
-    #print(count / (time.time() - start))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    ################   colon
-    #config = Res50JsonMaskConfig()
-    #dataset = config.dataset
-    #prefixes = dataset.image_prefixes()
-    #print(len(prefixes))
-
-    #os.makedirs(config.save_path, exist_ok=True)
-    #lmdb_writer = FeatLMDBWriter(config.save_path)
-    #count = 0
-    #start = time.time()
-    #for prefix in prefixes:
-    #    print(prefix)
-    #    image_lists = dataset.image_lists_by_prefix(prefix)
-    #    datasets = []
-    #    num_feats = []
-    #    rel_pathes = []
-    #    for image_name in image_lists.flatten():
-    #        rel_path, image, bboxes, coords, mask = dataset.get_res_by_image_path(image_name)
-    #        patch_dataset = Patches(image, coords, bboxes, 64)
-    #        #if len(bboxes) == 0:
-    #        #    print(rel_path)
-    #        #    print(len(patch_dataset))
-    #        datasets.append(patch_dataset)
-    #        #print(num_feat, len(patch_dataset))
-    #        num_feats.append(len(patch_dataset))
-    #        rel_pathes.append(rel_path)
-
-
-    #    count += sum(num_feats)
-
-    #    datasets = torch.utils.data.ConcatDataset(datasets)
-    #    data_loader = DataLoader(datasets, num_workers=4, batch_size=3000, shuffle=False)
-
-    #    node_features = []
-    #    node_coords = []
-    #    #wih torch.no_grad():
-    #    for images, coords in data_loader:
-    #        output = config.extract_func(images)
-    #        node_features.append(output)
-    #        node_coords.extend(coords)
-
-    #    node_features = np.vstack(node_features)
-    #    node_coords = np.vstack(node_coords)
-    #    prev = 0
-    #    #print('here...........................................')
-    #    #print(len(rel_pathes), len(num_feats))
-    #    #test_cum = 0
-    #    lmdb_pair = []
-    #    for rel_path, num_feat in zip(rel_pathes, num_feats):
-
-    #        sub_feat = node_features[prev : prev+num_feat]
-    #        sub_coord = node_coords[prev : prev+num_feat]
-    #        #print(sub_feat.shape, sub_coord.shape)
-    #        val = {
-    #            'feat' : sub_feat,
-    #            'coord' : sub_coord
-    #        }
-    #        val = pickle.dumps(val)
-    #        rel_path = rel_path.replace('.png', '.npy')
-    #        #print(rel_path, sub_feat.shape, sub_coord.shape)
-    #        prev += num_feat
-    #        lmdb_pair.append([rel_path.encode(), val])
-    #    lmdb_writer.add_pair(lmdb_pair)
-
-    #    print(count / (time.time() - start))
-
-        #assert test_cum == sum(num_feats)
-
-        #if node_features:
-        #    node_features = np.vstack(node_features)
-        #else:
-        #    node_features = np.array(node_features)
-
-        #if node_coords:
-        #    node_coords = np.vstack(node_coords)
-        #else:
-        #    node_coords = np.array(node_coords)
-
-        #assert len(node_coords) == len(node_features)
-        #print(node_coords.shape, node_features.shape)
-        #print(type(node_coords), type(node_features))
-
-        #print(type(val))
-
-        #print(rel_path)
-
-
-
-            #print(image.shape, len(bboxes), bboxes[0], len(coords), coords[0], mask)
-            #for box, coord in zip(bboxes, coords):
-                #image = cv2.circle(image, tuple(coord), 3, (0, 200, 0), cv2.FILLED, 3)
-                #image = cv2.rectangle(image, tuple(box[:2]), tuple(box[2:]), (255, 0, 0), thickness=3)
-
-            #image = cv2.resize(image, (0, 0), fx=0.25, fy=0.25)
-            #cv2.imwrite('test.png', image)
-            #sys.exit()
-
-
-    #def image_lists_by_prefix(self, prefix):
-    #    return self.image_dataset.file_grids[prefix].flatten()
-
-    #def get_res_by_image_path(self, image_path):
-    #config = Res50JsonMaskConfig()
-    #gen_training_data(config)
-    #print(len(dataset))
-    #image, rel_image_path, bboxes, coords = random.choice(dataset)
-    #for image, rel_image_path, bboxes, coords, mask in dataset
-
-
-    #for coord in coords:
-
-    #cv2.imwrite('heihei_del.png', image)

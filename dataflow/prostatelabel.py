@@ -46,6 +46,10 @@ def gen_label(mask):
     if sum(res) + grade0_sum == 0:
         return -1, -1
 
+    if sum(res) < 1550 * 1550 // 10:
+        return -1, -1
+
+
     if sum(res) == 0 and grade0_sum != 0:
         return (0, 0), 0
     #res = sorted(res, reverse=True)
@@ -100,7 +104,8 @@ def write_gleason_score(image_folder, label_folder):
     search_path = os.path.join(label_folder, '**', '*.png')
     #count = 0
     header = ['image name', 'primary score', 'secondary score', 'gleason score']
-    csv_fp = generate_csv_path(label_folder)
+    #csv_fp = generate_csv_path(label_folder)
+    csv_fp = 'test.csv'
     #print(csv_fp)
     with open(csv_fp, 'w', encoding='UTF8') as f:
         writer = csv.writer(f)
@@ -316,12 +321,12 @@ def validate_labels(image_path, label_path):
     cv2.imwrite('heihei.jpg', res)
 
 
-validate_labels(path_mask, save_path)
+#validate_labels(path_mask, save_path)
 
 
 
 
-#write_gleason_score(path_mask, save_path)
+write_gleason_score(path_mask, save_path)
 #crop_image(path, save_path)
 #path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Labels/Gleason_masks_test_pathologist1'
 #crop_image(path, save_path)
@@ -344,6 +349,8 @@ validate_labels(path_mask, save_path)
     #cv2.imwrite('aa.jpg', a)
 
 
+path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json/json_withtypes/json/'
+save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json/5Crops_json_withtypes/'
 #crop_json(path, save_path)
 
 #path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images/images/ZT111_4_B_1_14/ZT111_4_B_1_14.jpg'

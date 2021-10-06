@@ -212,6 +212,7 @@ class SoftPoolingGcnEncoder(nn.Module):
         if stage is None:
             stage = []
 
+        # self, dim, depth, heads, dim_head, mlp_dim, dropout = 0.):
         if  len(stage) == 2:
             self.pos_emb = nn.Parameter(torch.randn(1, 114, 20))
             self.trans_encoder2 = Transformer(20, depth, 2, 10, 20, 0.1)
@@ -413,6 +414,7 @@ class SoftPoolingGcnEncoder(nn.Module):
             x, adj = self._diff_pool(embed_feature, adj, assign, None)
 
         #if self.stage is not None and 2 in self.stage:
+        #print(x.shape, self.pos_emb.shape)
         if len(self.stage) == 2:
             #print('stage 2 double', self.trans_encoder2)
             x += self.pos_emb
@@ -456,6 +458,7 @@ class SoftPoolingGcnEncoder(nn.Module):
             x += self.pos_emb
             x = self.trans_encoder(x)
 
+        import sys; sys.exit()
         out, _ = torch.max(x, dim=1)
         out_all.append(out)  # out_all[0].size() torch.Size([1, 20])
         output = torch.cat(out_all, 1) # output.size() torch.Size([1, 60])
@@ -475,7 +478,7 @@ class SoftPoolingGcnEncoder(nn.Module):
         # output = self.mlp(readout)
 
 
-        if self.training:
-            cls_loss = F.cross_entropy(output, label, size_average=True)
-            return output, cls_loss
-        return output
+        #if self.training:
+        cls_loss = F.cross_entropy(output, label, size_average=True)
+            #return output, cls_loss
+        return output, cls_loss

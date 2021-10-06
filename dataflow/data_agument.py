@@ -6,6 +6,8 @@ import glob
 from collections import namedtuple
 from functools import partial
 import csv
+from concurrent.futures import ThreadPoolExecutor
+from itertools import repeat
 #import torch_geometric
 #from torch_geometric.data import Data
 import cv2
@@ -14,7 +16,7 @@ import numpy as np
 import stich
 from stich import JsonDataset, JsonFolder, ImageDataset, ImageFolder
 
-Node = namedtuple('Node', ['centroid', 'bbox', 'contour'])
+Node = namedtuple('Node', ['centroid', 'bbox', 'contour', 'type', 'type_prob'])
 """
 node bbox: [xmin, ymin, xmax, ymax]
              cen: [x, y]
@@ -125,7 +127,7 @@ def rotate90_transform(image_data, nodes, image_trans=True):
         bbox = construct_bbox(b1, b2)
         cnts = trans_cnt((w, h), node.contour, rotate90)
         #b2 = rotate90(b2)
-        res.append(Node(centroid=cen, bbox=bbox, contour=cnts))
+        res.append(Node(centroid=cen, bbox=bbox, contour=cnts, type=node.type, type_prob=node.type_prob))
 
     if image_trans:
         image_data = cv2.rotate(image_data, cv2.ROTATE_90_CLOCKWISE)
@@ -146,7 +148,7 @@ def rotate180_transform(image_data, nodes, image_trans=True):
         cnts = trans_cnt((w, h), node.contour, rotate180)
         #b2 = rotate90(b2)
         #res.append(Node(centroid=cen, bbox=[*b1, *b2], contour=cnts))
-        res.append(Node(centroid=cen, bbox=bbox, contour=cnts))
+        res.append(Node(centroid=cen, bbox=bbox, contour=cnts, type=node.type, type_prob=node.type_prob))
         #res.append(Node(centroid=cen, bbox=[*b1, *b2], contour=None))
 
     if image_trans:
@@ -172,7 +174,8 @@ def rotate270_transform(image_data, nodes, image_trans=True):
         #b2 = rotate90(b2)
         cnts = trans_cnt((w, h), node.contour, rotate270)
         #b2 = rotate90(b2)
-        res.append(Node(centroid=cen, bbox=bbox, contour=cnts))
+        #res.append(Node(centroid=cen, bbox=bbox, contour=cnts))
+        res.append(Node(centroid=cen, bbox=bbox, contour=cnts, type=node.type, type_prob=node.type_prob))
 
     if image_trans:
         image_data = cv2.rotate(image_data, cv2.ROTATE_90_COUNTERCLOCKWISE)
@@ -242,7 +245,8 @@ def flip_transform(image_data, nodes, axis, image_trans=True):
 
         trans_fnc = partial(flip, axis=axis)
         cnts = trans_cnt(origin, node.contour, trans_fnc)
-        res.append(Node(centroid=cen, bbox=bbox, contour=cnts))
+        #res.append(Node(centroid=cen, bbox=bbox, contour=cnts))
+        res.append(Node(centroid=cen, bbox=bbox, contour=cnts, type=node.type, type_prob=node.type_prob))
 
     if image_trans:
         image_data = np.flip(image_data, axis=axis)
@@ -301,7 +305,8 @@ def inverse_format(nodes, scale):
             #contour[:, 0] += bbox[0]
             #contour[:, 1] += bbox[1]
             contour += bbox[:2]
-            res.append(Node(centroid=cen, bbox=bbox, contour=contour))
+            #res.append(Node(centroid=cen, bbox=bbox, contour=contour))
+            res.append(Node(centroid=cen, bbox=bbox, contour=contour, type=node.type, type_prob=node.type_prob))
 
 def formatnode(nodes):
     res = []
@@ -312,7 +317,8 @@ def formatnode(nodes):
         bbox = [b for b in sum(bbox, [])] # y, x
         cnt = node['contour']
 
-        res.append(Node(centroid=cen, bbox=bbox, contour=cnt))
+        #res.append(Node(centroid=cen, bbox=bbox, contour=cnt))
+        res.append(Node(centroid=cen, bbox=bbox, contour=cnt, type=node['type'], type_prob=node['type_prob']))
 
     return res
 
@@ -324,8 +330,8 @@ def inverse_formatnode(nodes):
         bbox = res[-1]['bbox']
         bbox = [bbox[:2], bbox[2:]]
         res[-1]['bbox'] = bbox
-        res[-1]['type_prob'] = None
-        res[-1]['type'] = None
+        #res[-1]['type_prob'] = None
+        #res[-1]['type'] = None
 
     return res
 
@@ -343,7 +349,8 @@ def inverse_formatxy(nodes, scale):
 
         contour = [[int(x * scale), int(y * scale)] for [x, y] in node.contour]
         #contour = node['contour']
-        res.append(Node(centroid=cen, bbox=bbox, contour=contour))
+        #res.append(Node(centroid=cen, bbox=bbox, contour=contour))
+        res.append(Node(centroid=cen, bbox=bbox, contour=contour, type=node.type, type_prob=node.type_prob))
 
     return res
 
@@ -362,7 +369,8 @@ def formatxy(nodes, scale):
 
             contour = [[int(x / scale), int(y / scale)] for [x, y] in node.contour]
             #contour = node['contour']
-            res.append(Node(centroid=cen, bbox=bbox, contour=contour))
+            #res.append(Node(centroid=cen, bbox=bbox, contour=contour))
+            res.append(Node(centroid=cen, bbox=bbox, contour=contour, type=node.type, type_prob=node.type_prob))
 
     return res
 
@@ -376,8 +384,8 @@ def save_json(path, nodes, mag=None):
                 "bbox": node['bbox'],
                 "centroid": node['centroid'],
                 "contour": node['contour'],
-                "type_prob": None,
-                "type": None,
+                "type_prob": node['type_prob'],
+                "type": node['type'],
         }
 
 
@@ -666,6 +674,7 @@ class BACHAug:
 
     def cls_id(self, image_fp):
         image_name = os.path.basename(image_fp)
+        'Normal, Benign, in situ and Invasive {0,1,2,3}'
         if 'b' in image_name:
             return 1
         if 'n' in image_name:
@@ -1195,6 +1204,62 @@ def get_json_fp_prostate(path, json_save_path, idx):
 #json_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Json_Aug'
 #dataset = ECRC(image_path, json_path)
 
+
+class SaveData:
+    def __init__(self, image_save_path, json_save_path, image_fp_fn, json_fp_fn):
+        self.pool = ThreadPoolExecutor(8)
+        self.image_save_path = image_save_path
+        self.json_save_path = json_save_path
+        self.image_fp_fn = image_fp_fn
+        self.json_fp_fn = json_fp_fn
+
+    def save_files(self, images, labels, path):
+        save_file_fn = partial(self.save_file, path=path)
+        self.pool.map(save_file_fn, enumerate(zip(images, labels)))
+        #self.pool.map(self.save_file, enumerate(zip(images, labels)), repeat(path))
+
+
+
+    # save single file
+    def save_file(self, data, path):
+        #print(self.image_fp, 1111)
+        idx, (image, label) = data
+        #print(idx)
+        #img_fp = get_image_fp_bachaug(path, self.image_save_path, idx)
+        #json_fp = get_json_fp_bachaug(path, self.json_save_path, idx)
+        #print(self)
+        img_fp = self.image_fp_fn(path, self.image_save_path, idx)
+        json_fp = self.json_fp_fn(path, self.json_save_path, idx)
+
+        #os.makedirs(os.path.dirname(img_fp), exist_ok=True)
+        #print('saving image to {}...'.format(img_fp))
+        #cv2.imwrite(img_fp, image)
+        os.makedirs(os.path.dirname(json_fp), exist_ok=True)
+        print('saving json file to {}...'.format(json_fp))
+        save_json(json_fp, label)
+        #for idx, (image, label) in enumerate(zip(images, labels)):
+        #    #cv2.imwrite('tmp/{}_{}.jpg'.format(image_count, trans_count), image)
+        #    #json_name = image_name.replace('.', '-{}.'.format(idx))
+        #    #json_fp = image_name.split('.')[0] + '-{}.json'.format(idx)
+        #    #json_fp = os.path.join(json_save_path, json_fp)
+        #    #img_fp = img_save_fp.replace('.', '-{}.'.format(idx))
+        #    #img_fp = get_image_fp_prostate(path, image_save_path, idx)
+        #    #json_fp = get_json_fp_prostate(path, json_save_path, idx)
+        #    #img_fp = get_image_fp_ecrc(path, image_save_path, idx)
+        #    #json_fp = get_json_fp_ecrc(path, json_save_path, idx)
+        #    #img_fp = get_image_fp_prostate5crops(path, image_save_path, idx)
+        #    #json_fp = get_json_fp_prostate5crops(path, json_save_path, idx)
+        #    img_fp = get_image_fp_bachaug(path, image_save_path, idx)
+        #    json_fp = get_json_fp_bachaug(path, json_save_path, idx)
+
+
+        #    #os.makedirs(os.path.dirname(img_fp), exist_ok=True)
+        #    #print('saving image to {}...'.format(img_fp))
+        #    #cv2.imwrite(img_fp, image)
+        #    os.makedirs(os.path.dirname(json_fp), exist_ok=True)
+        #    print('saving json file to {}...'.format(json_fp))
+        #    save_json(json_fp, label)
+
 if __name__ == '__main__':
 
     #image_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images/images/'
@@ -1204,10 +1269,22 @@ if __name__ == '__main__':
     #dataset = Prosate(image_path, json_path, '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Labels/Gleason_masks_train.csv')
 
     #image_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images/5Crops'
-    #json_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json/5Crops'
+    ##json_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json/5Crops'
+    #json_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json/5Crops_json_withtypes/'
     #image_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images/5Crops_Aug'
-    #json_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json/5Crops_Aug'
+    ##json_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json/5Crops_Aug'
+    #json_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json/5Crops_json_withtypes_Aug'
     #csv_file = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Labels/5Crops.csv'
+    #dataset = Prosate5Crops(image_path, json_path, csv_file)
+    image_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Images/train'
+    json_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Json/withtypes/train/json'
+    #image_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Images/Image_Aug'
+    image_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Images_Aug_del'
+    #json_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Json_Aug_del'
+    #json_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Json_Aug_withtypes'
+    json_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Json_Aug_withtypes'
+    dataset = BACHAug(image_path, json_path)
+    writer = SaveData(image_save_path, json_save_path, get_image_fp_bachaug, get_json_fp_bachaug)
     #dataset = Prosate5Crops(image_path, json_path, csv_file)
 
     #image_save_path = 'tmp2'
@@ -1219,38 +1296,72 @@ if __name__ == '__main__':
     #csv_file = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Labels/5Crops.csv'
     #dataset = Prosate5CropsTest(image_path, json_path, csv_file)
 
-    image_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Images'
-    json_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Json/json'
-    image_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Images_Aug'
-    json_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Json_Aug'
+    #image_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Images'
+    #json_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Json/json'
+    #image_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Images_Aug'
+    #json_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Json_Aug'
     #csv_file = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Labels/5Crops.csv'
     #dataset = Prosate5Crops(image_path, json_path)
-    dataset = BACHAug(image_path, json_path)
+    #dataset = BACHAug(image_path, json_path)
+    #jfp = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json/5Crops_json_withtypes_Aug/ZT80_38_C_3_6_crop_1_grade_2_aug_6.json'
+    #imgfp = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images/5Crops_Aug/'
+    #ifp = os.path.join(imgfp, os.path.join(imgfp, os.path.basename(jfp).replace('.json', '.jpg')))
+    #print(ifp)
 
+    #image = cv2.imread(ifp)
+    #from jsonreader import NucleiReader
+    #reader = NucleiReader()
+    #nodes = reader.read_json(jfp)
+    #for node in nodes:
+    #    bbox = node['bbox']
+    #    bbox = [b for b in sum(bbox, [])] # y, x
+
+    #    #print(bbox)
+
+
+    #    #for bbox in bboxes:
+    #    assert bbox[0] < bbox[2]
+    #    assert bbox[1] < bbox[3]
+    #    image = cv2.rectangle(image, tuple(bbox[:2][::-1]), tuple(bbox[2:][::-1]), (255, 0, 0), 3)
+
+    #    #for coord in coords:
+    #    #print(node)
+    #    coord = node['centroid']
+    #    image = cv2.circle(image, tuple(coord), 3, (0, 200, 0), cv2.FILLED, 1)
+
+    #image = cv2.resize(image, (0, 0), fx=0.4, fy=0.4)
+    #cv2.imwrite('fff.jpg', image)
+
+    #import sys; sys.exit()
     #image_count = 0
+
     print(len(dataset))
+    args = []
     for images, labels, path in dataset:
-        for idx, (image, label) in enumerate(zip(images, labels)):
-            #cv2.imwrite('tmp/{}_{}.jpg'.format(image_count, trans_count), image)
-            #json_name = image_name.replace('.', '-{}.'.format(idx))
-            #json_fp = image_name.split('.')[0] + '-{}.json'.format(idx)
-            #json_fp = os.path.join(json_save_path, json_fp)
-            #img_fp = img_save_fp.replace('.', '-{}.'.format(idx))
-            #img_fp = get_image_fp_prostate(path, image_save_path, idx)
-            #img_fp = get_image_fp_ecrc(path, image_save_path, idx)
-            #json_fp = get_json_fp_ecrc(path, json_save_path, idx)
-            #img_fp = get_image_fp_prostate5crops(path, image_save_path, idx)
-            #json_fp = get_json_fp_prostate5crops(path, json_save_path, idx)
-            img_fp = get_image_fp_bachaug(path, image_save_path, idx)
-            json_fp = get_json_fp_bachaug(path, json_save_path, idx)
+        writer.save_files(images, labels, path)
+        #for idx, (image, label) in enumerate(zip(images, labels)):
+        #    #cv2.imwrite('tmp/{}_{}.jpg'.format(image_count, trans_count), image)
+        #    #json_name = image_name.replace('.', '-{}.'.format(idx))
+        #    #json_fp = image_name.split('.')[0] + '-{}.json'.format(idx)
+        #    #json_fp = os.path.join(json_save_path, json_fp)
+        #    #img_fp = img_save_fp.replace('.', '-{}.'.format(idx))
+        #    #img_fp = get_image_fp_prostate(path, image_save_path, idx)
+        #    #json_fp = get_json_fp_prostate(path, json_save_path, idx)
+        #    #img_fp = get_image_fp_ecrc(path, image_save_path, idx)
+        #    #json_fp = get_json_fp_ecrc(path, json_save_path, idx)
+        #    #img_fp = get_image_fp_prostate5crops(path, image_save_path, idx)
+        #    #json_fp = get_json_fp_prostate5crops(path, json_save_path, idx)
+        #    img_fp = get_image_fp_bachaug(path, image_save_path, idx)
+        #    json_fp = get_json_fp_bachaug(path, json_save_path, idx)
 
 
-            os.makedirs(os.path.dirname(img_fp), exist_ok=True)
-            print('saving image to {}...'.format(img_fp))
-            cv2.imwrite(img_fp, image)
-            os.makedirs(os.path.dirname(json_fp), exist_ok=True)
-            print('saving json file to {}...'.format(json_fp))
-            save_json(json_fp, label)
+        #    #os.makedirs(os.path.dirname(img_fp), exist_ok=True)
+        #    #print('saving image to {}...'.format(img_fp))
+        #    #cv2.imwrite(img_fp, image)
+        #    os.makedirs(os.path.dirname(json_fp), exist_ok=True)
+        #    print('saving json file to {}...'.format(json_fp))
+        #    save_json(json_fp, label)
+
         #import sys;sys.exit()
 
             #print(img_fp)

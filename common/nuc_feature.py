@@ -1,4 +1,5 @@
-from xtract_features.glcms import *
+#from xtract_features.glcms import *
+from skimage.feature import greycomatrix, greycoprops
 import scipy
 import scipy.stats
 import numpy as np
@@ -9,6 +10,7 @@ def nuc_stats_new(mask,intensity):
 	# print("intensity_crop.ndim " + str(intensity_crop.ndim))
 	# print("mask_crop.ndim " + str(mask_crop.ndim))
 	# print("type(intensity_crop[mask_crop>0])  " + str(type(intensity_crop[mask_crop>0])))
+	#print(mask_crop.shape, intensity_crop.shape)
 	intensity_instance_pixel = np.array(intensity_crop[mask_crop > 0])
 	intensity_background_pixel = np.array(intensity_crop[mask_crop == 0])
 	mean_instance_intensity = intensity_instance_pixel.sum() / \
@@ -38,5 +40,3 @@ def nuc_glcm_stats_new(mask, intensity):
 	glcm_ASM = glcm_ASM[0,0]
 
 	return glcm_contrast, glcm_dissimilarity, glcm_homogeneity, glcm_energy, glcm_ASM
-
-

@@ -10,6 +10,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import lmdb
+import torch
 
 
 #class BaseLists:
@@ -26,6 +27,20 @@ class BaseLists:
 
     def read_file(self, image_path):
         NotImplementedError
+
+class PtFolders(BaseLists):
+    def __init__(self, path):
+        super().__init__(path)
+        search_path = os.path.join(path, '**', '*.pt')
+        self.pt_names = []
+        for i in glob.iglob(search_path, recursive=True):
+            self.pt_names.append(i)
+
+    def file_list(self):
+        return self.pt_names
+
+    def read_file(self, pt_path):
+        return torch.load(pt_path)
 
 class JsonFolder(BaseLists):
     def __init__(self, path):
@@ -167,8 +182,6 @@ class BaseDataset:
         row, col = file_grid.shape
         row = row - self.border + 1
         col = col - self.border + 1
-        #print(row, col)
-        #print('sample_idx', sample_idx, 'row', row, 'col', col, 111)
         r_idx = int(sample_idx / col)
         c_idx = int(sample_idx % col)
         return r_idx, c_idx
@@ -181,7 +194,6 @@ class BaseDataset:
         r_idx, c_idx = self.imagefp2coords[path]
         base_name = os.path.basename(path)
         image_prefix = base_name.split('_grade_')[0]
-        #print(self.file_grids.keys()[0])
         file_grid = self.file_grids[image_prefix]
         patch = file_grid[r_idx : r_idx+self.border, c_idx : c_idx+self.border]
         data = self.stich_files(patch)
@@ -194,7 +206,6 @@ class BaseDataset:
     #abstrct
     def __getitem__(self, idx):
         image_idx = bisect.bisect_right(self.cum_sum, idx)
-        #print(image_idx)
         prefix = self.file_prefixes[image_idx]
         file_grid = self.file_grids[prefix]
 
@@ -203,10 +214,7 @@ class BaseDataset:
         else:
             sample_idx = idx - self.cum_sum[image_idx - 1]
 
-        #print(sample_idx)
-        #print(image_grid)
         r_idx, c_idx = self.grid_idx(file_grid, sample_idx)
-        #print(r_idx, c_idx)
         patch = file_grid[r_idx : r_idx+self.border, c_idx : c_idx+self.border]
         path = file_grid[r_idx, c_idx]
         #image = self.stich_files(patch)
@@ -223,7 +231,6 @@ class BaseDataset:
     def __len__(self):
         return self.cum_sum[-1]
         #length = 0
-        ##print(self.file_grids['test_can_be_del2/fold_3/2_low_grade/Grade2_Patient_002_073780_036698'])
         #for k, v in self.file_grids.items():
         #    v1, v2 = v.shape
         #    length += (v1 - self.border + 1) * (v2 - self.border + 1)
@@ -238,7 +245,6 @@ class BaseDataset:
     @property
     def file_prefixes(self):
         res = []
-        #print(11, len(self.file_grids.keys()))
         for k, v in self.file_grids.items():
             res.append(k)
         return  res
@@ -295,10 +301,6 @@ class BaseDataset:
 
             file_grids.append(np.array(row))
             file_clusters[k] = np.array(file_grids)
-            #print(image_clusters[k].shape)
-            #print(image_clusters[k][3:5, 5:8])
-            #print(image_clusters[k].shape)
-            #print(image_clusters[k])
 
         return file_clusters
 
@@ -332,7 +334,6 @@ class ImageDataset(BaseDataset):
                 image = self.file_list.read_file(path)
                 h.append(image)
             image = np.hstack(h)
-            #print(image.shape)
             v.append(image)
             h = []
         image = np.vstack(v)
@@ -344,14 +345,10 @@ class ImageDataset(BaseDataset):
         for idx, (k, v) in enumerate(self.file_grids.items()):
 
             base_name = os.path.basename(k + '.png')
-            #print(os.path.join(ori_folder, base_name))
             src_image = cv2.imread(os.path.join(ori_folder, base_name), -1)
 
             stich_image = self.stich_files(v)
-            #print(v.shape)
-            #print(v[-1])
 
-            #print(stich_image.shape, src_image.shape)
             assert stich_image.shape == src_image.shape
 
             image = np.hstack([stich_image, src_image])
@@ -418,45 +415,70 @@ class LMDBDataset(BaseDataset):
 
         return {'feat' : node_features, 'coord' : node_coords}
 
+class PtDataset(BaseDataset):
+    def assert_data(self, data):
+        assert 'feat' in data
+        assert 'coord' in data
+
+    def stich_files(self, patch, scale=2):
+        res = {
+            'feat' : [],
+            'coord' : []
+        }
+        row, col = patch.shape[:2]
+        for r_idx in range(row):
+            for c_idx in range(col):
+                fp = patch[r_idx, c_idx]
+                data = self.file_list.read_file(fp)
+                assert len(data['feat']) == len(data['coord'])
+                feat = data['feat']
+                coord = data['coord']
+                if len(data['feat']) != 0:
+                    coord[:, 1] += c_idx * 224 * scale
+                    coord[:, 0] += r_idx * 224 * scale
+
+                res['feat'].append(feat)
+                res['coord'].append(coord)
+
+        res['feat'] = torch.cat(res['feat'], dim=0)
+        res['coord'] = torch.cat(res['coord'], dim=0)
+
+        return res
+
 
 class JsonDataset(BaseDataset):
     def assert_data(self, data):
         assert len(data) > 0
         assert type(data) == list
 
-    def stich_files(self, patch):
+    def stich_files(self, patch, scale=2):
         res = []
 
-        #print(patch)
         #for fp in patch.flatten():
         row, col = patch.shape[:2]
         for r_idx in range(row):
             for c_idx in range(col):
                 fp = patch[r_idx, c_idx]
                 nodes = self.file_list.read_file(fp)
-                #print(r_idx, c_idx, len(nodes))
                 for node in nodes:
                     # centeroid [x, y] # /data/by/tmp/hover_net/models/hovernet/post_proc.py  process
                     #node['centroid'][0] /= 2
                     #node['centroid'][1] /= 2
-                    #print(node['centroid'])
 
                     # unit_size = 224 * 2
-                    node['centroid'][0] += c_idx * 224 * 2
-                    node['centroid'][1] += r_idx * 224 * 2
+                    node['centroid'][0] += c_idx * 224 * scale
+                    node['centroid'][1] += r_idx * 224 * scale
                     #node['bbox'][0][0]
-                    node['bbox'][0][0] += r_idx * 224 * 2
-                    node['bbox'][0][1] += c_idx * 224 * 2
-                    node['bbox'][1][0] += r_idx * 224 * 2
-                    node['bbox'][1][1] += c_idx * 224 * 2
+                    node['bbox'][0][0] += r_idx * 224 * scale
+                    node['bbox'][0][1] += c_idx * 224 * scale
+                    node['bbox'][1][0] += r_idx * 224 * scale
+                    node['bbox'][1][1] += c_idx * 224 * scale
 
-                    #print(node['contour'])
-                    #print(type(node['contour']))
                     #node['contour'][:, 0] += r_idx * 224 * 2
                     #node['contour'][:, 1] += c_idx * 224 * 2
                     #print(node['contour'])
                     # contour: (x,y)
-                    node['contour'] = [[c1 + c_idx * 224 * 2, c2 + r_idx * 224 * 2] for [c1, c2] in node['contour']]
+                    node['contour'] = [[c1 + c_idx * 224 * scale, c2 + r_idx * 224 * scale] for [c1, c2] in node['contour']]
                     #print(node['contour'])
 
                     #import sys; sys.exit()
@@ -595,4 +617,76 @@ def draw_nuclei(image, json_label):
 #
 #    #print(image.shape)
 #    #cv2.imwrite('test_can_be_del/test{}.png'.format(idx), image)
+#
+
+
+#path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/'
+#
+#
+#
+#folder = PtFolders(path)
+#dataset = PtDataset(folder, 224 * 8)
+#print(len(dataset))
+#import random
+#path, data = random.choice(dataset)
+##data = dataset[33][1]
+##path = dataset[33][0]
+#print(path)
+#image_folder = ImageFolder('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Images')
+#img_dataset = ImageDataset(image_folder, 224 * 8)
+#image_path = path.replace('Feat_hand_crafted', 'Images').replace('.pt', '.png').replace('0/', '')
+##print(path)
+##print(image_path)
+#
+##image = img_dataset[33][1]
+#image = img_dataset.get_file_by_path(image_path)
+#image = cv2.resize(image, (0, 0), fx=2, fy=2)
+#
+#print(type(data), len(data))
+##image = cv2.imread(image_path)
+#print(image.shape)
+#coord = data['coord']
+#for c in coord:
+#        #print(c)
+#        image = cv2.circle(image, tuple(c.tolist()[::-1]), 3, (330, 0, 0), 3)
+#
+#image = cv2.resize(image, (0, 0), fx=0.3, fy=0.3)
+#cv2.imwrite('fff.jpg', image)
+##for k, v in data.items():
+##    print(k, v.shape)
+#
+#
+##for k in data['coord']:
+##    print(k)
+#
+#
+#
+##path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_hand_crafted/0/'
+##image_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Images/'
+##
+##count = 0
+##for i in glob.iglob(os.path.join(path, '**', '*.pt'), recursive=True):
+##    count += 1
+##    if count != 10000:
+##        continue
+##    print(i)
+##    dirname = os.path.dirname(i)
+##    basename = os.path.basename(i)
+##    dirnames = dirname.split('/')[-2:]
+##    print(dirnames)
+##    img_fp = os.path.join(image_path, *dirnames, basename.replace('.pt', '.png'))
+##    print(img_fp)
+##    image = cv2.imread(img_fp)
+##
+##    image = cv2.resize(image, (0, 0), fx=2, fy=2)
+##    data = torch.load(i)
+##    coord = data['coord']
+##    #print(coord.shape)
+##    #print(coord[:, 0].shape)
+##    for c in coord:
+##        #print(c)
+##        image = cv2.circle(image, tuple(c.tolist()[::-1]), 3, (330, 0, 0), 3)
+##
+##    cv2.imwrite('fff.jpg', image)
+##    break
 #

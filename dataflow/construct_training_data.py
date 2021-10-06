@@ -12,6 +12,7 @@ sys.path.append(os.getcwd())
 
 import lmdb
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from torch.nn.functional import adaptive_avg_pool3d
 from torchvision import transforms
@@ -79,8 +80,11 @@ class Patches:
         self.bboxes = bboxes
         self.patch_size = patch_size
         self.coords = coords
-        mean = (0.7862793912386359, 0.6027306811087783, 0.7336620786688793) #bgr
-        std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
+        #mean = (0.7862793912386359, 0.6027306811087783, 0.7336620786688793) #bgr
+        #std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
+        mean = [0.73646324, 0.56556627, 0.70180897] # Expanuke bgr
+        #self.std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
+        std = [0.18869222, 0.21968669, 0.17277594] # Expanuke bgr
         self.transforms = transforms.Compose([
             transforms.ToPILImage(),
             transforms.Resize((self.patch_size, self.patch_size)),
@@ -96,6 +100,7 @@ class Patches:
         bbox = self.bboxes[idx]
         #print(bbox, idx)
         bbox = self.pad_patch(*bbox, self.patch_size)
+        #print(self.image.shape, bbox[2] - bbox[0], bbox[3] - bbox[1])
         patch = self.image[bbox[0]: bbox[2]+1, bbox[1]:bbox[3]+1]
         patch = self.transforms(patch)
         return patch, np.array(self.coords[idx])
@@ -135,11 +140,12 @@ def network(network_name, num_classes, pretrained):
 #### generating features
 class ExtractorResNet50:
     def __init__(self, path):
-        self.net = network('resnet50',  4, False)
+        self.net = network('resnet50',  5, False)
         print('loading weight file {}...'.format(path))
         self.net.load_state_dict(torch.load(path))
         print('Done.')
         self.net = self.net.cuda()
+        self.net = torch.nn.DataParallel(self.net)
 
     def __call__(self, images):
         node_features = self.net(images.cuda())
@@ -355,7 +361,7 @@ class ImageNumpy:
     def __getitem__(self, idx):
         image_path = self.image_names[idx]
         image = cv2.imread(image_path)
-        image = cv2.resize(image, (0,0), fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
+        #image = cv2.resize(image, (0,0), fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
 
         bboxes = []
         coords = []
@@ -392,7 +398,6 @@ class ImageJson:
         image_path = Path(self.image_lists[idx])
         rel_image_path = str(image_path.relative_to(self.image_folder))
         image = self.image_dataset.get_file_by_path(str(image_path))
-        image = cv2.resize(ori_image, (0,0), fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
         json_path = self.image2json_fp(image_path)
         labels = self.json_dataset.get_file_by_path(json_path)
         #print(type(labels))
@@ -466,6 +471,7 @@ class LMDBWriter:
             if printable:
                 print('writing files to {}...'.format(
                     os.path.join(self.save_path, key)))
+            #print(self.save_path, 'ffffffffffffff')
             txn.put(key.encode(), value)
 
 class LMDBReader:
@@ -567,7 +573,7 @@ def _avg_pool_x(cluster, x, size=None):
     return scatter(x, cluster, dim=0, dim_size=size, reduce='mean')
 
 def avg_pooling(data):
-    cluster = grid_cluster(data.pos, torch.Tensor([64, 64]))
+    cluster = grid_cluster(data.pos, torch.Tensor([32, 32]))
     cluster, perm = consecutive_cluster(cluster)
     x = None if data.x is None else _avg_pool_x(cluster, data.x)
     pos = None if data.pos is None else pool_pos(cluster, data.pos)
@@ -580,7 +586,8 @@ def _add_pool_x(cluster, x, size=None):
     return scatter(x, cluster, dim=0, dim_size=size, reduce='add')
 
 def add_pooling(data):
-    cluster = grid_cluster(data.pos, torch.Tensor([64, 64]))
+    #cluster = grid_cluster(data.pos, torch.Tensor([64, 64]))
+    cluster = grid_cluster(data.pos, torch.Tensor([32, 32]))
     cluster, perm = consecutive_cluster(cluster)
     x = None if data.x is None else _add_pool_x(cluster, data.x)
     pos = None if data.pos is None else pool_pos(cluster, data.pos)
@@ -619,7 +626,7 @@ def gen_training_data(conf):
     #####processed data
 
     #image, rel_image_path, bboxes, coords, mask = random.choice(dataset)
-    data_loader = DataLoader(dataset, num_workers=2, batch_size=16, shuffle=False, collate_fn=object_list)
+    data_loader = DataLoader(dataset, num_workers=2, batch_size=16 * 3, shuffle=False, collate_fn=object_list)
     print('extracting node features......')
     count = 0
     for image, rel_image_path, bboxes, coords, mask in data_loader:
@@ -666,6 +673,9 @@ def gen_training_data(conf):
             print('[{}/{}]'.format(count, len(dataset)))
             conf.writer(str(p), val, conf.print)
 
+
+
+
     ######################## read features
     print('generating cell graph....')
     dataset = conf.reader(conf.save_path)
@@ -681,7 +691,7 @@ def gen_training_data(conf):
                 os.makedirs(os.path.join(save_path, str(epoch)), exist_ok=True)
                 fp = os.path.join(save_path, str(epoch), p.split('.')[0] + '.pt')
                 print(fp)
-                #torch.save(d, fp)
+                torch.save(d, fp)
 
 
 
@@ -694,7 +704,7 @@ def gen_training_data(conf):
             #print(k, v.shape)
 
 
-    sys.exit()
+    #sys.exit()
 
 
     #for coord in node_coords:
@@ -722,7 +732,8 @@ class Res50BaseConfig:
         folder_name = 'fix_{}_{}_{}'.format(self.pool, self.seg, self.method)
         self.training_data_path = os.path.join('/home/baiyu/training_data/CRC', folder_name)
         self.return_mask = True
-        res50_path = '/home/baiyu/HGIN/checkpoint/191-best.pth'
+        #res50_path = '/home/baiyu/HGIN/checkpoint/191-best.pth'
+        res50_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ResNet50/97-best.pth'
 
         #mean = (0.7862793912386359, 0.6027306811087783, 0.7336620786688793) #bgr
         #std = (0.2111620715800869, 0.24114924152086661, 0.23603441662670357)
@@ -740,7 +751,7 @@ class Res50BaseConfig:
         #                                                    extractor=self.extract_func)
         #extract_node_feat
         self.node_feature_coords = partial(extract_node_features_resnet,
-                                        batch_size=3000,
+                                        batch_size=3000 * 4,
                                         patch_size=patch_size,
                                         extractor=self.extract_func,
                                         )
@@ -766,11 +777,17 @@ class Res50NumpyMaskConfig(Res50BaseConfig):
         self.reader = partial(LMDBReader.init_dataset, transform=transform)
 
 
-class Res50JsonMaskConfig:
+class Res50JsonMaskConfig(Res50BaseConfig):
     def __init__(self):
-        self.image_path = '/home/baiyu/Extended_CRC'
-        self.label_path = '/home/baiyu/EXtended_CRC_Mask'
-        self.save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_lmdb/extended_crc/res50_1792_avg_knn/proto/'
+        super().__init__()
+        #self.image_path = '/home/baiyu/Extended_CRC'
+        self.image_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Images/'
+        #self.label_path = '/home/baiyu/EXtended_CRC_Mask'
+        self.label_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Json/EXtended_CRC_Mask/'
+        #self.save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_lmdb/extended_crc/res50_1792_avg_knn/proto/'
+
+        # nuclei feature save_path
+        self.save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat_ExPanNuke/' #lmdb writer path
 
         self.pool = 'avg'
         transform = avg_pooling
@@ -779,7 +796,10 @@ class Res50JsonMaskConfig:
 
         self.seg = 'hover'
         folder_name = 'fix_{}_{}_{}'.format(self.pool, self.seg, self.method)
-        self.training_data_path = os.path.join('/home/baiyu/training_data/ExtendedCRC', folder_name)
+
+        # cell_graph path
+        #self.training_data_path = os.path.join('/home/baiyu/training_data/ExtendedCRC', folder_name)
+        self.training_data_path = os.path.join('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Avg_64_ExPanNuke', folder_name)
         self.return_mask = False
         self.dataset = ImageJson(self.image_path, self.label_path, self.image_size, self.return_mask)
         #self.reader = lmdb_concatenate(self.save_path, transform=transform)
@@ -793,9 +813,11 @@ if __name__ == '__main__':
     #dataset = ImageJson('/home/baiyu/Extended_CRC', '/home/baiyu/EXtended_CRC_Mask', 1792)
     #image_path = '/home/baiyu/Extended_CRC'
     #json_path = '/home/baiyu/EXtended_CRC_Mask'
-    config = Res50NumpyMaskConfig()
-    #config = Res50JsonMaskConfig()
+    #config = Res50NumpyMaskConfig()
+    config = Res50JsonMaskConfig()
+    #import sys; sys.exit()
     gen_training_data(config)
+
     #print(len(dataset))
     #image, rel_image_path, bboxes, coords = random.choice(dataset)
     #for image, rel_image_path, bboxes, coords, mask in dataset

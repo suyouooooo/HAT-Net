@@ -15,7 +15,7 @@ import time
 from common.utils import mkdirs, save_checkpoint, load_checkpoint, init_optim, output_to_gexf, Metric, EarlyStopping
 from torch.optim import lr_scheduler
 from model import network_GIN_Hierarchical, network_CGCNet
-from model.network_GIN_baiyu import HatNet
+from model.network_GIN_baiyu import HatNet, Prostate
 from torch_geometric.nn import DataParallel
 from torch_geometric.utils import dropout_adj
 from dataflow.data import prepare_train_val_loader
@@ -55,8 +55,8 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
                 #data = data.cuda()
                 data.to('cuda:0')
 
-                ypred, _ = model(data)
-                metric.update(ypred, torch.tensor(label), patch_name)
+            ypred, _ = model(data)
+            metric.update(ypred, torch.tensor(label), patch_name)
 
     start_cal = time.time()
     patch_acc = metric.patch_accuracy()
@@ -72,6 +72,8 @@ def gen_prefix(args):
 
     name = args.dataset
     name += '_' + args.method
+    if args.droprate != 0:
+        name += '_droprate_{}'.format(args.droprate)
     if args.method == 'soft-assign':
         name += '_l' + str(args.num_gc_layers) + 'x' + str(args.num_pool)
         name += '_ar' + str(int(args.assign_ratio*100))
@@ -182,8 +184,8 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
     for epoch in range(start_epoch, args.num_epochs):
         epoch_start = time.time()
         model.train()
-        if args.name == 'fuse':
-            dataset.dataset.set_epoch(epoch)
+        #if args.name == 'fuse':
+            #dataset.dataset.set_epoch(epoch)
 
         for batch_idx, data in enumerate(dataset):
             #pppp = time.time()
@@ -290,6 +292,7 @@ def cell_graph(args, writer = None):
     # val==test loader since we do cross-val
 
     train_loader, val_loader, test_loader = prepare_train_val_loader(args)
+    num_nodes = train_loader.dataset.num_nodes
     setting = DataSetting()
     input_dim = args.input_feature_dim
     if args.task == 'CRC':
@@ -297,13 +300,23 @@ def cell_graph(args, writer = None):
     elif args.task == 'ECRC':
         args.num_classes = 3
     elif args.task == 'TCGA':
+        #args.num_classes = 5
         args.num_classes = 2
+    elif args.task == 'BACH':
+        args.num_classes = 4
     else:
         raise ValueError('wrong task name')
     # model = atten_network.SpGAT(18,args.hidden_dim,3, args.drop_out, args.assign_ratio,3)
     if args.network == 'HGTIN':
         #model = HatNet(512, 128, args.num_classes)
-        model = HatNet(514, 64, args.num_classes)
+        #model = Prostate(1036, 64, args.num_classes)
+        #model = HatNet(1036, 64, args.num_classes)
+
+    #elif args.network == 'TCGA':
+        #model = Prostate(1036, 64, args.num_classes)
+
+        #model = HatNet(input_dim, 64, args.num_classes, num_nodes=num_nodes)
+        model = HatNet(input_dim, args.hidden_dim, args.num_classes, num_nodes=num_nodes)
         #model = network_GIN_Hierarchical.SoftPoolingGcnEncoder(setting.max_num_nodes,
         #    input_dim, args.hidden_dim, args.output_dim, True, True, args.hidden_dim,  args.num_classes,
         #                                      args.assign_ratio,[50], concat= True,
@@ -331,7 +344,9 @@ def cell_graph(args, writer = None):
                                               jk=args.jump_knowledge
                                               )
 
-    #print(model)
+    print(model)
+    #model.load_state_dict(torch.load('output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_namefuse_adj0.4_BACH_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs1000_lr0.001_networkHGTIN_gamma0.1/Monday_27_September_2021_18h_30m_12s/model_best.pth.tar')['state_dict'], strict=False)
+    model.load_state_dict(torch.load('output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_nameavg_adj0.4_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs1000_lr0.001_networkHGTIN_gamma0.1/Tuesday_05_October_2021_14h_14m_37s/model_best.pth.tar')['state_dict'], strict=False)
     #if args.cross_val == 1:
     #    model_path = '/home/baiyu/HGIN/output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_nameavg_adj0.4_ECRC_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs35_lr0.001_networkHGTIN_gamma0.1/Wednesday_28_July_2021_20h_49m_55s/model_best.pth.tar'
     #    print('loading file from {}'.format(model_path))
@@ -472,6 +487,7 @@ def arg_parse():
     parser.add_argument('--network', default='HGTIN', type=str)
     parser.add_argument('--jk_tec', default='lstm', type=str)
     parser.add_argument('--pool_tec', default='mincut', type=str)
+    parser.add_argument('--droprate', default=0.0, type=float)
 
     parser.set_defaults(datadir=data_setting.root,
                         logdir=data_setting.log_path,

@@ -1,6 +1,7 @@
 import os.path as osp
 import os
 import torch
+import csv
 from torch.utils.data import SubsetRandomSampler
 from torch_geometric.data import Dataset
 from torch_geometric.data import Data, DataListLoader, DataLoader
@@ -14,7 +15,7 @@ from common.utils import FarthestSampler,filter_sampled_indice, sparse_to_dense,
 # from torch_geometric.utils import to_dense_adj, dense_to_sparse
 from setting import CrossValidSetting
 from .mean_std import MEAN_STD
-from datasets.prostate import TCGAProstate
+from datasets.prostate import TCGAProstate, CRC, TCGAProstateTestNormalize
 
 
 _CROSS_VAL = {1:{'train':['fold_1', 'fold_2'], 'valid': ['fold_3']},
@@ -23,7 +24,8 @@ _CROSS_VAL = {1:{'train':['fold_1', 'fold_2'], 'valid': ['fold_3']},
 
 }
 
-_MEAN_CIA, _STD_CIA = MEAN_STD['res50_avg_cia_ecrc']
+#_MEAN_CIA, _STD_CIA = MEAN_STD['res50_avg_cia_ecrc']
+_MEAN_CIA, _STD_CIA = MEAN_STD['res50_fuse_cia_crc']
 #_MEAN_CIA, _STD_CIA = MEAN_STD['res50_add_cia']
 ##############hand craf
 #_MEAN_CIA = {1:[ 1.44855589e+02,  1.50849152e+01,  4.16993829e+02, -9.89115031e-02,
@@ -144,18 +146,126 @@ def cluster_images(image_file_path):
     clusters = {}
     for idx, fp in enumerate(image_file_path):
         prefix = os.path.basename(fp).split('_aug_')[0]
+        #prefix = os.path.basename(fp).split('_grade_')[0]
         if prefix not in clusters:
             clusters[prefix] = []
         clusters[prefix].append(idx)
     return clusters
 
-def get_tgca_dataset(args):
-    from datasets.prostate import TCGAProstate, TCGAProstateLMDB
 
-    def split_train_test(image_file_path, args):
-        fold_num = 432
+def get_ecrc_dataset(args):
+    #_MEAN_CIA = {1:[ 1.44855589e+02,  1.50849152e+01,  4.16993829e+02, -9.89115031e-02,
+    #     4.29073361e+00,  7.03308534e+00,  1.50311764e-01,  1.20372119e-01,
+    #     1.99874447e-02,  7.24825770e-01,  1.28062193e+02,  1.71914904e+01,
+    #     9.00313323e+00,  4.29522533e+01,  8.76540101e-01,  8.06801284e+01, 3584 / 2,3584 / 2],
+    #     2:[ 1.45949547e+02,  1.53704952e+01,  4.39127922e+02, -1.10080479e-01,
+    #     4.30617772e+00,  7.27624697e+00,  1.45825849e-01,  1.21214980e-01,
+    #     2.03645262e-02,  7.28225987e-01,  1.27914898e+02,  1.72524907e+01,
+    #     8.96012595e+00,  4.30067152e+01,  8.76016742e-01,  8.09466370e+01,3584 / 2,3584 / 2],
+    #     3:[ 1.45649518e+02,  1.52438912e+01,  4.30302592e+02, -1.07054163e-01,
+    #     4.29877990e+00,  7.13800092e+00,  1.47971754e-01,  1.20517868e-01,
+    #     2.00830612e-02,  7.24701226e-01,  1.26430193e+02,  1.71710396e+01,
+    #     8.94070628e+00,  4.27421136e+01,  8.74665450e-01,  8.02611304e+01,3584 / 2,3584 / 2]}
+
+    #_STD_CIA = {1:[3.83891570e+01, 1.23159786e+01, 3.74384781e+02, 5.05079918e-01,
+    #    1.91811771e-01, 2.95460595e+00, 7.31040425e-02, 7.41484835e-02,
+    #    2.84762625e-02, 2.47544275e-01, 1.51846534e+02, 5.96200235e+01,
+    #    6.00087195e+00, 2.85961395e+01, 1.95532620e-01, 5.49411936e+01,3584 / 2,3584 / 2],
+    #        2:[3.86514982e+01, 1.25207234e+01, 3.87362858e+02, 5.02515226e-01,
+    #    1.89045551e-01, 3.05856764e+00, 7.22404102e-02, 7.53090608e-02,
+    #    2.90460236e-02, 2.46734916e-01, 1.53743958e+02, 6.34661492e+01,
+    #    6.02575043e+00, 2.88403590e+01, 1.94214810e-01, 5.49984596e+01,3584 /2 ,3584 / 2],
+    #        3:[3.72861596e+01, 1.23840868e+01, 3.87834784e+02, 5.02444847e-01,
+    #    1.86722327e-01, 2.99248449e+00, 7.20327363e-02, 7.45553798e-02,
+    #    2.87285660e-02, 2.49195190e-01, 1.50986869e+02, 6.56370060e+01,
+    #    6.00008814e+00, 2.86376250e+01, 1.97764021e-01, 5.54134874e+01,3584 / 2,3584 / 2]}
+
+
+    # vggunet mean std  CRC dataset
+    #mean = torch.tensor([3.6078e+02, 2.0862e+01, 9.2485e-02, 8.5345e-02, 1.5290e-01, 1.5779e-01,
+    #    1.4657e-01, 8.7895e-02, 9.2753e-02, 7.6343e-02, 9.9353e-02, 9.9057e-02,
+    #    9.9898e-02, 8.8499e-02, 7.8472e-02, 8.5856e-02])
+    #std = torch.tensor([5.9021e+02, 2.4498e+00, 3.2903e-05, 1.6971e-05, 7.2713e-05, 7.7875e-05,
+    #    4.6795e-05, 1.9148e-05, 2.1554e-05, 2.4778e-05, 4.6882e-05, 8.1360e-06,
+    #    3.0058e-05, 1.7471e-05, 1.5239e-05, 1.5900e-05])
+    mean = torch.tensor([-0.0045, -0.0020, -0.0014,  0.0004,  0.0020, -0.0048,  0.0003, -0.0012,
+        -0.0006,  0.0018,  0.0005,  0.0012,  0.0013,  0.0009,  0.0017,  0.0019])
+
+    std = torch.tensor([1.8510e-06, 1.5487e-06, 2.7994e-06, 1.7810e-06, 1.9513e-06, 1.6132e-06,
+        1.9129e-06, 1.5540e-06, 2.5018e-06, 1.6314e-06, 2.3036e-06, 1.0341e-06,
+        3.7000e-06, 4.4376e-06, 1.8439e-06, 4.0598e-06])
+
+    cv = args.cross_val
+
+    #mean = torch.tensor(_MEAN_CIA[int(cv)]).float()
+    #std = torch.tensor(_STD_CIA[int(cv)]).float()
+    print('drop rate:')
+    #if args.droprate == 0.5:
+    #    print(args.droprate)
+    #    train_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/drop50percentnodes', cv, 'train')
+    #    test_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/drop50percentnodes', cv, 'test')
+    #elif args.droprate == 0.3:
+    #    print(args.droprate)
+    #    train_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/drop30percentnodes', cv, 'train')
+    #    test_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/drop30percentnodes', cv, 'test')
+    #elif args.droprate == 0.1:
+    #    print(args.droprate)
+    #train_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/drop10percentnodes', cv, 'train')
+    #test_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/drop10percentnodes', cv, 'test')
+    #else:
+    #    print('hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh')
+    #    train_dataset = CRCLMDB('/data/by/tmp/excrc_data/1792_Avg_64_LMDB', cv, 'train')
+    #    test_dataset = CRCLMDB('/data/by/tmp/excrc_data/1792_Avg_64_LMDB', cv, 'test')
+
+    #train_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/ImageNetPretrain/', cv, 'train')
+    #test_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/ImageNetPretrain/', cv, 'test')
+    #train_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/VGGUet/', cv, 'train')
+    #test_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/VGGUet/', cv, 'test')
+    #train_dataset = CRC('/data/hdd1/by/cell_graph/VGGUet', cv, 'train')
+    #test_dataset = CRC('/data/hdd1/by/cell_graph/VGGUet', cv, 'test')
+    train_dataset = CRC('/data/hdd1/by/cpc_cell_graph/CPC', cv, 'train')
+    test_dataset = CRC('/data/hdd1/by/cpc_cell_graph/CPC', cv, 'test')
+    #train_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/', cv, 'train')
+    #test_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/', cv, 'test')
+    #train_dataset = CRCLMDB('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Avg_64_LMDB/', cv, 'train')
+    #test_dataset = CRCLMDB('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Avg_64_LMDB', cv, 'test')
+    #train_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Avg_64/proto/fix_avg_cia_knn/0/', cv, 'train')
+    #test_dataset = CRCLMDB('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Avg_64/proto/fix_avg_cia_knn/0/', cv, 'test')
+    print(len(train_dataset), len(test_dataset))
+    train_dataset.mean = mean
+    train_dataset.std = std
+    test_dataset.mean = mean
+    test_dataset.std = std
+    train_set = DataLoader(train_dataset, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=True, pin_memory=True)
+    test_set = DataLoader(test_dataset, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False, pin_memory=True)
+
+    return train_set, test_set, test_set
+
+
+def get_bach_dataset(args):
+    from datasets.bach import BACH
+    #train_dataset = BACH('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/hatnet128dim/')
+    #test_dataset = BACH('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/test/hatnet128dim/')
+    #train_dataset = BACH('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/hatnet32dim/')
+    #test_dataset = BACH('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/test/hatnet32dim/')
+    #train_dataset = BACH('trainbach512/hatnet512dim/')
+    #test_dataset = BACH('testbach512/hatnet512dim/')
+    train_dataset = BACH('trainbach512/hatnet512dim_backup/')
+    test_dataset = BACH('testbach512/hatnet512dim_backup/')
+    #train_dataset = BACH('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/cgc16dim/')
+    #test_dataset = BACH('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/test/cgc16dim/')
+
+    train_set = DataLoader(train_dataset, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=True, pin_memory=True)
+    test_set = DataLoader(test_dataset, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False, pin_memory=True)
+
+    return train_set, test_set, test_set
+
+def get_tgca_dataset(args):
+
+    def split_train_test_random(image_file_path, args):
         cv = args.cross_val
-        cv = 1
+        assert 1 <= cv <= 5
+        #cv = 1
 
         clusters = cluster_images(image_file_path)
         train_indices = []
@@ -164,44 +274,19 @@ def get_tgca_dataset(args):
         prefixes = sorted(prefixes)
         random.Random(42).shuffle(prefixes)
 
-        grade1_prefix = []
-        grade2_prefix = []
-        for prefix in prefixes:
-            if '_grade_1' in prefix:
-                grade1_prefix.append(prefix)
-            elif '_grade_2' in prefix:
-                grade2_prefix.append(prefix)
-            else:
-                raise ValueError('ffffffffff')
-
-        grade1_num = int(fold_num / 2)
-        grade2_num = int(fold_num / 2)
-
-        train_set = grade1_prefix[:grade1_num * (cv - 1)]
-        train_set.extend(grade1_prefix[grade1_num * cv:])
-        test_set = grade1_prefix[grade1_num * (cv - 1) :  grade1_num * cv]
-
-
-        train_set.extend(grade2_prefix[:grade2_num * (cv - 1)])
-        train_set.extend(grade2_prefix[grade2_num * cv:])
-        test_set.extend(grade2_prefix[grade2_num * (cv - 1) : grade2_num * cv])
-        #train_indices.extend(test_indices[fold_num * cv:])
-
-
-        #for
-        #print(prefixes)
-        #train_set = prefixes[:fold_num * (cv - 1)]
-        #train_set.extend(prefixes[fold_num * cv:])
-        #train_indices.extend(test_indices[fold_num * cv:])
-        #test_indices = test_indices[fold_num * (cv - 1) : fold_num * cv]
-        #test_set = prefixes[fold_num * (cv - 1) : fold_num * cv]
+        #fold_num = int(len(prefixes) / 5)
+        fold_num = 432
+        train_set = prefixes[:fold_num * (cv - 1)]
+        train_set.extend(prefixes[fold_num * cv:])
+        test_set = prefixes[fold_num * (cv - 1) : fold_num * cv]
 
         test_indices = []
         for prefix in test_set:
             #print(prefix)
             value = clusters[prefix]
             for v in value:
-                if '_aug_0' in os.path.basename(image_file_path[v]):
+                #if '_aug_0' in os.path.basename(image_file_path[v]):
+                if '_grade_' in os.path.basename(image_file_path[v]):
                     #print(image_file_path[v])
                     test_indices.append(v)
                     break
@@ -210,23 +295,6 @@ def get_tgca_dataset(args):
         for prefix in train_set:
             value = clusters[prefix]
             train_indices.extend(value)
-
-        #print(test_indices[10: 30])
-        #print(train_indices[10: 30])
-        #import sys; sys.exit()
-        #print(len(train_set), len(test_set))
-        #print(len(train_indices), len(test_indices))
-        #import sys; sys.exit()
-
-
-        #print(len(image_file_path))
-        #image_file_path = sorted(image_file_path, key=lambda x:os.path.basename(x))
-        #for idx, fp in enumerate(image_file_path):
-        #    base_name = os.path.basename(fp)
-        #    if '_aug_0' in base_name:
-        #        test_indices.append(idx)
-        #    else:
-        #        train_indices.append(idx)
 
         random.Random(42).shuffle(test_indices)
         random.Random(42).shuffle(train_indices)
@@ -269,32 +337,256 @@ def get_tgca_dataset(args):
         #train_indices.extend(test_indices[:fold_num * (cv - 1)])
         #train_indices.extend(test_indices[fold_num * cv:])
         #test_indices = test_indices[fold_num * (cv - 1) : fold_num * cv]
+        print(len(test_indices), len(train_indices))
 
         return train_indices, test_indices
+    def split_train_test_five_folds(image_file_path, args):
+        folds = {}
+        for idx, fp in enumerate(image_file_path):
+            prefix = os.path.basename(fp).split('_')[0]
+            if prefix not in folds:
+                folds[prefix] = []
+
+            folds[prefix].append(idx)
+
+
+        cv = args.cross_val
+        assert 1 <= cv <= 5
+        #cv = 1
+        fold_num = 432
+        prefixes = list(folds.keys())
+        prefixes = sorted(prefixes)
+
+        train_indices = []
+        test_indices = []
+        #for pre in prefixes:
+        print(prefixes)
+        for cv_idx, pre in enumerate(prefixes):
+            if cv_idx != cv - 1:
+                train_indices.extend(folds[pre])
+
+            else:
+                for img_idx in folds[pre]:
+                    fp = image_file_path[img_idx]
+                    base_name = os.path.basename(fp)
+                    if '_aug_0' in base_name:
+                        #print(base_name)
+                        if '_grade_1' in base_name:
+                            print(base_name)
+                        test_indices.append(img_idx)
+
+                test_indices = sorted(test_indices)
+                random.Random(42).shuffle(test_indices)
+                test_indices = test_indices[:432]
+
+
+        random.Random(42).shuffle(train_indices)
+        #print(len(train_indices), len(test_indices))
+        #import sys; sys.exit()
+        return train_indices, test_indices
+
+
+
+    # 99.duo
+    #def split_train_test(image_file_path, args):
+    #     cv = args.cross_val
+    #     assert 1 <= cv <= 5
+    #     fold_num = 432
+
+    #     clusters = cluster_images(image_file_path)
+    #     train_indices = []
+    #     test_indices = []
+    #     prefixes = list(clusters.keys())
+    #     prefixes = sorted(prefixes)
+    #     random.Random(42).shuffle(prefixes)
+
+    #     train_set = prefixes[:fold_num * (cv - 1)]
+    #     train_set.extend(prefixes[fold_num * cv:])
+    #     test_set = prefixes[fold_num * (cv - 1) :  fold_num * cv]
+
+    #     test_indices = []
+    #     for prefix in test_set:
+    #         #print(prefix)
+    #         value = clusters[prefix]
+    #         for v in value:
+    #             if '_aug_0' in os.path.basename(image_file_path[v]):
+    #                 #print(image_file_path[v])
+    #                 test_indices.append(v)
+    #                 break
+
+    #     train_indices = []
+    #     for prefix in train_set:
+    #         value = clusters[prefix]
+    #         train_indices.extend(value)
+
+    #     random.Random(42).shuffle(test_indices)
+    #     random.Random(42).shuffle(train_indices)
+
+    #     return train_indices, test_indices
+
+
+
+
+
+
+
+
+
+    def split_train_test(image_file_path, args):
+         cv = args.cross_val
+         assert 1 <= cv <= 5
+         #cv = 1
+         fold_num = 432
+
+         clusters = cluster_images(image_file_path)
+         train_indices = []
+         test_indices = []
+         prefixes = list(clusters.keys())
+         prefixes = sorted(prefixes)
+         random.Random(42).shuffle(prefixes)
+
+         grade1_prefix = []
+         grade2_prefix = []
+         for prefix in prefixes:
+             if '_grade_1' in prefix:
+                 grade1_prefix.append(prefix)
+             elif '_grade_2' in prefix:
+                 grade2_prefix.append(prefix)
+             else:
+                 raise ValueError('ffffffffff')
+
+         grade1_num = int(fold_num / 2)
+         grade2_num = int(fold_num / 2)
+
+         train_set = grade1_prefix[:grade1_num * (cv - 1)]
+         train_set.extend(grade1_prefix[grade1_num * cv:])
+         test_set = grade1_prefix[grade1_num * (cv - 1) :  grade1_num * cv]
+
+
+         train_set.extend(grade2_prefix[:grade2_num * (cv - 1)])
+         train_set.extend(grade2_prefix[grade2_num * cv:])
+         test_set.extend(grade2_prefix[grade2_num * (cv - 1) : grade2_num * cv])
+         #train_indices.extend(test_indices[fold_num * cv:])
+
+
+         #for
+         #print(prefixes)
+         #train_set = prefixes[:fold_num * (cv - 1)]
+         #train_set.extend(prefixes[fold_num * cv:])
+         #train_indices.extend(test_indices[fold_num * cv:])
+         #test_indices = test_indices[fold_num * (cv - 1) : fold_num * cv]
+         #test_set = prefixes[fold_num * (cv - 1) : fold_num * cv]
+
+         test_indices = []
+         for prefix in test_set:
+             #print(prefix)
+             value = clusters[prefix]
+             for v in value:
+                 if '_aug_0' in os.path.basename(image_file_path[v]):
+                     #print(image_file_path[v])
+                     test_indices.append(v)
+                     break
+
+         train_indices = []
+         for prefix in train_set:
+             value = clusters[prefix]
+             train_indices.extend(value)
+
+         #print(test_indices[10: 30])
+         #print(train_indices[10: 30])
+         #import sys; sys.exit()
+         #print(len(train_set), len(test_set))
+         #print(len(train_indices), len(test_indices))
+         #import sys; sys.exit()
+
+
+         #print(len(image_file_path))
+         #image_file_path = sorted(image_file_path, key=lambda x:os.path.basename(x))
+         #for idx, fp in enumerate(image_file_path):
+         #    base_name = os.path.basename(fp)
+         #    if '_aug_0' in base_name:
+         #        test_indices.append(idx)
+         #    else:
+         #        train_indices.append(idx)
+
+         random.Random(42).shuffle(test_indices)
+         random.Random(42).shuffle(train_indices)
+
+         #g1 = 0
+         #g2 = 0
+         #for i in test_indices:
+         #    name = os.path.basename(image_file_path[i])
+         #    if '_grade_1' in name:
+         #        g1 += 1
+
+         #    elif '_grade_2' in name:
+         #        g2 += 1
+
+         #    else:
+         #        raise ValueError('fffff')
+
+         #print(g1, g2, g1 + g2)
+         #print(len(train_indices), len(test_indices))
+         #import sys;sys.exit()
+
+         #grade1 = 0
+         #grade2 = 0
+         #for i in test_indices:
+         #    name = image_file_path[i]
+         #    if '_grade_1' in name:
+         #        grade1 += 1
+         #    elif '_grade_2' in name:
+         #        grade2 += 1
+         #    else:
+         #        raise ValueError('ffff')
+         #print(grade1, grade2)
+         #import sys; sys.exit()
+
+
+         #fold_num = 432
+         #cv = args.cross_val
+         ##cv = 1
+
+         #train_indices.extend(test_indices[:fold_num * (cv - 1)])
+         #train_indices.extend(test_indices[fold_num * cv:])
+         #test_indices = test_indices[fold_num * (cv - 1) : fold_num * cv]
+
+         return train_indices, test_indices
 
     #dataset = TCGAProstate('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops')
+    #dataset = TCGAProstate('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_CPC/')
     #dataset = TCGAProstate('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug')
-    dataset = TCGAProstateLMDB('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_LMDB/')
+    #dataset = TCGAProstateLMDB('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_LMDB/')
+    #dataset = TCGAProstateLMDB('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_ColorJitter_LMDB/')
+    #dataset = TCGAProstateLMDB('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_CPC/')
+    #dataset = TCGAProstateLMDB('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_CPC_LMDB/')
+    #dataset = TCGAProstateLMDB('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_LMDB/')
+    #dataset = TCGAProstate('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Res50_withtype_Aug/')
+    #dataset = TCGAProstate('/data/hdd1/by/HGIN/acc872_prostate_5cropsAug')
+    #dataset = TCGAProstateTestNormalize('/data/hdd1/by/HGIN/acc872_prostate_5cropsAug')
+    #dataset = TCGAProstateTestNormalize('/data/hdd1/by/HGIN/acc872_prostate_5cropsAug_fix_label/')
+    #dataset = TCGAProstateTestNormalize('/data/hdd1/by/HGIN/acc872_prostate_5cropsAug_fix_label/')
+    dataset = TCGAProstateTestNormalize('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_CGC16dim/')
+    #dataset = TCGAProstate('ttt_del1/')
+
+
+
+    #dataset = TCGAProstateLMDB('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_LMDB/')
     image_file_path = dataset.filepath()
-    train_indices, test_indices = split_train_test(image_file_path, args)
-    #print(test_indices[:10], len(test_indices))
-    #print(train_indices[:10], len(train_indices))
-    #print(len(train_indices), len(test_indices))
-
-    #import sys; sys.exit()
-
-    #indices = list(range(len(dataset)))
-    #fold_num = 432
-    #random.Random(42).shuffle(indices)
-    #if args.cv == 1:
-
-    #cv = args.cross_val
-    #test_idx = indices[fold_num * (cv - 1) : fold_num * cv]
-    #print(len(test_idx))
+    #train_indices, test_indices = split_train_test(image_file_path, args) # class balanced
+    #train_indices, test_indices = split_train_test_five_folds(image_file_path, args)
+    train_indices, test_indices = split_train_test_random(image_file_path, args)
     test_sampler = SubsetRandomSampler(test_indices)
     train_sampler = SubsetRandomSampler(train_indices)
-    train_set = DataLoader(dataset, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False, sampler=train_sampler)
-    test_set = DataLoader(dataset, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False, sampler=test_sampler)
+    train_set = DataLoader(dataset, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False, sampler=train_sampler, pin_memory=True)
+    test_set = DataLoader(dataset, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False, sampler=test_sampler, pin_memory=True)
+
+
+    #dataset = TCGAProstateLMDB('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/train_lmdb')
+    #train_set = DataLoader(dataset, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=True, pin_memory=True)
+    #dataset = TCGAProstateLMDB('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/test_lmdb')
+    #test_set = DataLoader(dataset, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False, pin_memory=True)
+
 
     #train_set = TCGAProstate('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph_Aug/0')
     #train_set = []
@@ -395,6 +687,12 @@ def prepare_train_val_loader(args):
         #return prostate_dataset(args)
         return get_tgca_dataset(args)
 
+    if args.task == 'ECRC':
+        return get_ecrc_dataset(args)
+
+    if args.task == 'BACH':
+        return get_bach_dataset(args)
+
     setting = CrossValidSetting()
     sampler_type = None
     print(args.load_data_list)
@@ -421,6 +719,7 @@ def prepare_train_val_loader(args):
         batch_size=args.batch_size,
         shuffle=True if sampler_type is None else False,
         num_workers=args.num_workers,
+        pin_memory=True
     )
 
     validset = NucleiDatasetBatchOutput(root=setting.root,
@@ -712,8 +1011,10 @@ class NucleiDatasetBatchOutput(NucleiDataset):
                                                         ,datasetting=datasetting,neighbour=neighbour,
                                                         graph_sampler =graph_sampler,crossval = crossval, name=name, mask=mask )
 
+        self.num_nodes = 3367
     def get(self, idx):
         epoch = self.epoch if self.split=='train' else self.val_epoch
+        #print(osp.join(self.processed_fix_data_root, str(epoch), self.idxlist[idx]))
         if self.dynamic_graph:
             data = torch.load(osp.join(self.processed_root, self.idxlist[idx]))
         else:
@@ -744,5 +1045,6 @@ class NucleiDatasetBatchOutput(NucleiDataset):
             raise NotImplementedError
         data.patch_idx = torch.tensor([idx])
         data.x = (data.x - self.mean) / self.std
+        #print(self.idxlist[idx])
         #print(idx, '33333')
         return data
