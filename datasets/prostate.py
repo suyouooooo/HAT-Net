@@ -746,105 +746,105 @@ class TCGAProstate(Dataset):
 
         return (x - mean) / std
 
-class CRC(Dataset):
-    def __init__(self, root, cv, data_set, transforms=None):
-        super().__init__(root)
-        cv = 'fold_{}'.format(cv)
-        self.root = root
-        search_path = os.path.join(self.root, '**', '*.pt')
-        self.file_names = []
-        self.idxlist = []
-        for fp in glob.iglob(search_path, recursive=True):
-            if data_set == 'train':
-                if cv not in fp:
-                    self.file_names.append(fp)
-                    self.idxlist.append(os.path.basename(fp))
-            elif data_set == 'test':
-                if cv in fp:
-                    self.file_names.append(fp)
-                    self.idxlist.append(os.path.basename(fp))
-            else:
-                raise ValueError('wrong value')
-
-        self.transforms = transforms
-        #self.mean = torch.tensor(mean)
-        #self.std = torch.tensor(std)
-        #self.coord_mean =
-
-        # min, max of unet vgg
-        self.min = torch.tensor([-0.0199, -0.0183, -0.0149, -0.0160, -0.0201, -0.0251, -0.0141, -0.0180,
-        -0.0119, -0.0061, -0.0116, -0.0071, -0.0183, -0.0280, -0.0183, -0.0271])
-        self.max = torch.tensor([0.0027, 0.0058, 0.0096, 0.0111, 0.0080, 0.0009, 0.0073, 0.0097, 0.0134,
-        0.0152, 0.0121, 0.0116, 0.0087, 0.0087, 0.0079, 0.0082])
-        #self.min = torch.tensor([9.0000e+01, 7.1388e+00, 7.2445e-02, 6.8259e-02, 1.1786e-01, 1.1679e-01,
-        #1.1255e-01, 6.5754e-02, 7.1361e-02, 5.6361e-02, 7.1411e-02, 6.7237e-02,
-        #6.6426e-02, 5.8134e-02, 4.7020e-02, 5.6861e-02])
-        #self.max = torch.tensor([6.1515e+03, 2.6721e+01, 2.7360e-01, 2.0685e-01, 3.4070e-01, 4.1898e-01,
-        #3.9159e-01, 1.2634e-01, 1.4812e-01, 3.1718e-01, 1.9040e-01, 1.3550e-01,
-        #1.8788e-01, 1.6921e-01, 1.6068e-01, 1.3820e-01])
-        self.num_nodes = 3367
-
-    def normalize(self, x):
-        #[10, -3]   # max 11, min -5
-        diff = self.max - self.min
-        x = x - self.min  # larger than 0
-        x = x / diff  # normalize to 0 - 1
-        #x += self.max
-        mean = (self.mean - self.min) / diff # normlized mean
-        std = (self.std - self.min) / diff  # normalized std
-
-        return (x - mean) / std
-
-    def filepath(self):
-        return self.file_names
-
-    def len(self):
-        return len(self.file_names)
-
-    def get(self, idx):
-        fp = self.file_names[idx]
-        data = torch.load(fp)
-        #print(data)
-        #if self.transforms is not None:
-        #    data = self.transforms(data)
-
-        #data.x[torch.isnan(data.x)] = 0
-        #data.x[torch.isinf(data.x)] = 0
-        data.patch_idx = torch.tensor([idx])
-        #print(data.x.mean(), fp, data.x)
-        #print(data.x[torch.isnan(data.x)])
-        #data.x = torch.cat([data.x, data.pos], dim=1)
-        #print(data.x.shape)
-        #print(self.mean)
-        #print(torch.isnan(data.x).sum())
-        #print(torch.isnan(data.x))
-        #print(data.x.mean())
-        #print(data.x.max(), data.x.min(), 'befre', idx)
-        #data.x = (data.x - self.mean[:16]) / self.std[:16]
-        #data.x = (data.x - self.mean) / self.std
-
-        #####################
-        #imagenet pretrain
-        #mean = torch.tensor((1792.9, 1782.7))
-        #std = torch.tensor((1.0348e+03, 1.0332e+03))
-        #data.x = data.x - 0.4
-        #data.pos = (data.pos - mean) / std
-        #data.x = torch.cat([data.x, data.pos], dim=1)
-        ##########################
-        #data.x = data.x.float()
-        data.path = fp
-        data.x = self.normalize(data.x).float()
-        #print(data.x.max(), data.x.min())
-
-        #print(self.mean, self.std)
-        #print(data.x)
-        #print(data.x, 'before')
-        #data.x = (data.x - self.mean) / self.std
-        #print(data.x.max(), data.x.min(), 'after', idx)
-        #print(data.x)
-        #print(data, data.y)
-
-        return data
+#class CRC(Dataset):
+#    def __init__(self, root, cv, data_set, transforms=None):
+#        super().__init__(root)
+#        cv = 'fold_{}'.format(cv)
+#        self.root = root
+#        search_path = os.path.join(self.root, '**', '*.pt')
+#        self.file_names = []
+#        self.idxlist = []
+#        for fp in glob.iglob(search_path, recursive=True):
+#            if data_set == 'train':
+#                if cv not in fp:
+#                    self.file_names.append(fp)
+#                    self.idxlist.append(os.path.basename(fp))
+#            elif data_set == 'test':
+#                if cv in fp:
+#                    self.file_names.append(fp)
+#                    self.idxlist.append(os.path.basename(fp))
+#            else:
+#                raise ValueError('wrong value')
+#
+#        self.transforms = transforms
+#        #self.mean = torch.tensor(mean)
+#        #self.std = torch.tensor(std)
+#        #self.coord_mean =
+#
+#        # min, max of unet vgg
+#        self.min = torch.tensor([-0.0199, -0.0183, -0.0149, -0.0160, -0.0201, -0.0251, -0.0141, -0.0180,
+#        -0.0119, -0.0061, -0.0116, -0.0071, -0.0183, -0.0280, -0.0183, -0.0271])
+#        self.max = torch.tensor([0.0027, 0.0058, 0.0096, 0.0111, 0.0080, 0.0009, 0.0073, 0.0097, 0.0134,
+#        0.0152, 0.0121, 0.0116, 0.0087, 0.0087, 0.0079, 0.0082])
+#        #self.min = torch.tensor([9.0000e+01, 7.1388e+00, 7.2445e-02, 6.8259e-02, 1.1786e-01, 1.1679e-01,
+#        #1.1255e-01, 6.5754e-02, 7.1361e-02, 5.6361e-02, 7.1411e-02, 6.7237e-02,
+#        #6.6426e-02, 5.8134e-02, 4.7020e-02, 5.6861e-02])
+#        #self.max = torch.tensor([6.1515e+03, 2.6721e+01, 2.7360e-01, 2.0685e-01, 3.4070e-01, 4.1898e-01,
+#        #3.9159e-01, 1.2634e-01, 1.4812e-01, 3.1718e-01, 1.9040e-01, 1.3550e-01,
+#        #1.8788e-01, 1.6921e-01, 1.6068e-01, 1.3820e-01])
+#        self.num_nodes = 3367
+#
+#    def normalize(self, x):
+#        #[10, -3]   # max 11, min -5
+#        diff = self.max - self.min
+#        x = x - self.min  # larger than 0
+#        x = x / diff  # normalize to 0 - 1
+#        #x += self.max
+#        mean = (self.mean - self.min) / diff # normlized mean
+#        std = (self.std - self.min) / diff  # normalized std
+#
+#        return (x - mean) / std
+#
+#    def filepath(self):
+#        return self.file_names
+#
+#    def len(self):
+#        return len(self.file_names)
+#
+#    def get(self, idx):
+#        fp = self.file_names[idx]
+#        data = torch.load(fp)
+#        #print(data)
+#        #if self.transforms is not None:
+#        #    data = self.transforms(data)
+#
+#        #data.x[torch.isnan(data.x)] = 0
+#        #data.x[torch.isinf(data.x)] = 0
+#        data.patch_idx = torch.tensor([idx])
+#        #print(data.x.mean(), fp, data.x)
+#        #print(data.x[torch.isnan(data.x)])
+#        #data.x = torch.cat([data.x, data.pos], dim=1)
+#        #print(data.x.shape)
+#        #print(self.mean)
+#        #print(torch.isnan(data.x).sum())
+#        #print(torch.isnan(data.x))
+#        #print(data.x.mean())
+#        #print(data.x.max(), data.x.min(), 'befre', idx)
+#        #data.x = (data.x - self.mean[:16]) / self.std[:16]
+#        #data.x = (data.x - self.mean) / self.std
+#
+#        #####################
+#        #imagenet pretrain
+#        #mean = torch.tensor((1792.9, 1782.7))
+#        #std = torch.tensor((1.0348e+03, 1.0332e+03))
+#        #data.x = data.x - 0.4
+#        #data.pos = (data.pos - mean) / std
+#        #data.x = torch.cat([data.x, data.pos], dim=1)
+#        ##########################
+#        #data.x = data.x.float()
+#        data.path = fp
+#        data.x = self.normalize(data.x).float()
+#        #print(data.x.max(), data.x.min())
+#
+#        #print(self.mean, self.std)
+#        #print(data.x)
+#        #print(data.x, 'before')
+#        #data.x = (data.x - self.mean) / self.std
+#        #print(data.x.max(), data.x.min(), 'after', idx)
+#        #print(data.x)
+#        #print(data, data.y)
+#
+#        return data
 
 
         #self.processed_dir = root

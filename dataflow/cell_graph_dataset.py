@@ -1,5 +1,6 @@
 import glob
 import os
+from pathlib import Path
 
 import torch
 #from multiprocessing import Pool
@@ -50,6 +51,8 @@ class CellGraphPt:
         for pt in glob.iglob(os.path.join(path, '**', '*.pt'), recursive=True):
             self.npy_names.append(pt)
 
+        self.path = path
+
     def len(self):
         return len(self)
 
@@ -61,13 +64,16 @@ class CellGraphPt:
 
     def __getitem__(self, idx):
         npy_path = self.npy_names[idx]
+        rel_image_path = Path(npy_path).relative_to(self.path)
         data = torch.load(npy_path)
         data = read_data(data, npy_path)
         #data = fuse(data)
         #if self.transforms is not None:
         for trans in self.transforms:
-                data = trans(data)
+            data = trans(data)
 
         data = gen_cell_graph(data)
-        data.path = npy_path
+
+        #print(rel_image_path)
+        data.path = rel_image_path
         return data

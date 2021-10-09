@@ -300,3 +300,9 @@ vggunet_cv1
 vggunet_cv2
 vggunet_cv3
 datasets/cccc.py
+compute_std_vggunet
+crc_pannuke_cv2
+crc_pannuke_cv3
+gen_crc
+gen_crc2
+gen_ecrc

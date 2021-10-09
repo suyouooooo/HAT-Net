@@ -121,6 +121,10 @@ def dataset_stats(pathes):
 
 
     mean = feat_sum / count
+    num_nodes = torch.tensor(int(count / len(pathes)))
+    print('count:', count)
+    print('total:', len(pathes))
+    print('avg:', num_nodes)
     if torch.isnan(mean).sum() != 0:
         print('mean')
         torch.save(mean, 'mean.pt')
@@ -134,7 +138,7 @@ def dataset_stats(pathes):
         torch.save(std, 'std.pt')
 
 
-    return min_value, max_value, mean, std
+    return min_value, max_value, mean, std, num_nodes
 
 
 #path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_fuse_cia_knn'
@@ -156,7 +160,9 @@ def main():
     #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/hatnet2048dim/'
     #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/hatnet2048dim/'
     #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/hatnet512dim/'
-    data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_CGC16dim/'
+    #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_CGC16dim/'
+    #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/VGGUet_438dim/'
+    data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/PanNukeEx6classes/proto/fix_avg_cia_knn/'
     #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/hatnet128dim/'
     #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/hatnet32dim/'
     #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/cgc16dim/'
@@ -174,7 +180,7 @@ def main():
 
     #minmax = max_min(pathes)
     #print(minmax)
-    min_value, max_value, mean, std = dataset_stats(pathes)
+    min_value, max_value, mean, std, num_nodes = dataset_stats(pathes)
     print(min_value)
     print()
     print(max_value)
@@ -182,6 +188,7 @@ def main():
     #np.save(os.path.join(save_path, 'minmax.npy'), minmax)
     np.save(os.path.join(save_path, 'min.npy'), min_value)
     np.save(os.path.join(save_path, 'max.npy'), max_value)
+    np.save(os.path.join(save_path, 'num_nodes.npy'), num_nodes)
 
 
     #print('before:', len(pathes))

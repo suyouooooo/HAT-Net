@@ -346,7 +346,7 @@ def cell_graph(args, writer = None):
 
     print(model)
     #model.load_state_dict(torch.load('output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_namefuse_adj0.4_BACH_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs1000_lr0.001_networkHGTIN_gamma0.1/Monday_27_September_2021_18h_30m_12s/model_best.pth.tar')['state_dict'], strict=False)
-    model.load_state_dict(torch.load('output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_nameavg_adj0.4_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs1000_lr0.001_networkHGTIN_gamma0.1/Tuesday_05_October_2021_14h_14m_37s/model_best.pth.tar')['state_dict'], strict=False)
+    #model.load_state_dict(torch.load('output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_nameavg_adj0.4_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs1000_lr0.001_networkHGTIN_gamma0.1/Tuesday_05_October_2021_14h_14m_37s/model_best.pth.tar')['state_dict'], strict=False)
     #if args.cross_val == 1:
     #    model_path = '/home/baiyu/HGIN/output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_nameavg_adj0.4_ECRC_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs35_lr0.001_networkHGTIN_gamma0.1/Wednesday_28_July_2021_20h_49m_55s/model_best.pth.tar'
     #    print('loading file from {}'.format(model_path))

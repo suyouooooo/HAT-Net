@@ -104,6 +104,7 @@ class TorchWriter:
         save_path = os.path.join(self.save_path, name)
 
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        #print(save_path)
         torch.save(val, save_path)
 
     def add_pair(self, pairs):
@@ -130,7 +131,10 @@ class CellGraphWriter:
         self.thread_pool = ThreadPoolExecutor(4)
 
     def write_sample(self, data):
-        save_path = os.path.join(self.save_path, os.path.basename(data.path.replace('.jpg', '.pt')))
+
+        #save_path = os.path.join(self.save_path, os.path.basename(data.path.replace('.jpg', '.pt')))
+        #data.path : relative path in dataset folder
+        save_path = os.path.join(self.save_path, data.path)
         #print(111,  save_path)
         #print(data)
         #sys.exit()
@@ -138,8 +142,12 @@ class CellGraphWriter:
             return
 
         #print(save_path)
-        print(save_path)
+        #print(save_path)
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        #print(save_path)
         torch.save(data.clone(), save_path)
+        #print(save_path)
+        #import sys; sys.exit()
 
     def write_batch(self, batch):
         self.thread_pool.map(
@@ -159,7 +167,6 @@ def generate_features_batch(data_loader, num_feats, rel_pathes, writer, deep_ext
     for idx, (coords, images, hand_feats) in enumerate(data_loader):
         images_mask = images == -1
         hand_feats_mask = hand_feats == -1
-        #if images == -1]:
 
         # images not empty
         if images_mask.sum() != len(images):
@@ -168,9 +175,7 @@ def generate_features_batch(data_loader, num_feats, rel_pathes, writer, deep_ext
             #if hand_feats is not None:
             # deep and hand features
             if hand_feats_mask.sum() != len(hand_feats):
-                #print(deep_feats.shape, hand_feats.shape)
                 output = np.hstack([deep_feats , hand_feats])
-                #print(output.shape)
 
             ## only deep feature
             # hand_feats is None
@@ -187,13 +192,15 @@ def generate_features_batch(data_loader, num_feats, rel_pathes, writer, deep_ext
 
         #print(coords.shape)
 
+        #print(output.shape, coords.shape)
         node_features.append(output)
         node_coords.append(coords)
 
     node_features = np.vstack(node_features)
     node_coords = np.vstack(node_coords)
-    #print(node_features.shape)
-    #print(node_coords.shape)
+    print('----------------')
+    print(node_features.shape)
+    print(node_coords.shape)
     assert len(node_features) == len(node_coords)
     prev = 0
     lmdb_pair = []
@@ -228,7 +235,7 @@ def feat_pipline(patch_dataset, deep_extractor, save_path, num_epoches, data_wri
     print(len(patch_dataset))
     #batch_size = 128  # batch size for raw images
     #batch_size = 16  # batch size for raw images
-    batch_size = 4  # batch size for raw images
+    batch_size = 8  # batch size for raw images
     patch_dataset_loader = torch.utils.data.DataLoader(patch_dataset, batch_size=batch_size, num_workers=2, collate_fn=lambda x : x)
     print(patch_dataset_loader)
 
@@ -248,7 +255,8 @@ def feat_pipline(patch_dataset, deep_extractor, save_path, num_epoches, data_wri
         # generate patches
         print('generating patches')
         pds = torch.utils.data.ConcatDataset(pds)
-        pd_loader = DataLoader(pds, num_workers=4, batch_size=128 * 16, shuffle=False)  # batch size for nuclei patches
+        pd_loader = DataLoader(pds, num_workers=4, batch_size=128 * 16 * 2, shuffle=False)  # batch size for nuclei patches
+        #pd_loader = DataLoader(pds, num_workers=4, batch_size=1, shuffle=False)  # batch size for nuclei patches
         #print('dataset size:', len(patch_dataset), sum(num_feats))
 
         for epoch in range(num_epoches):
@@ -356,7 +364,8 @@ def main():
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Feat_Aug/hatnet2048dim'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Feat/test/cgc16dim'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat/5Crops_Aug_CGC16dim'
-    save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/VGGUet_438dim'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/VGGUet_438dim'
+    save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/PanNukeEx6Classes'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Feat_Aug/cgc16dim/'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Feat/test/hatnet2048dim'
 
@@ -370,8 +379,6 @@ def main():
     std = [0.18869222, 0.21968669, 0.17277594] # Expanuke bgr
 
 
-    #mean = [0.72369437, 0.44910724, 0.68094617] # bach bgr / pannuke bgr
-    #std = [0.17274064, 0.20472058, 0.20758244] # bach bgr / pannuke bgr
 
     #mean = (0.42019099703461577, 0.41323568513979647, 0.4010048431259079) # vgg16unet monusac bgr
     #std = (0.30598050258519743, 0.3089986932156864, 0.3054061869915674) # vgg16unet monusac bgr
@@ -392,6 +399,7 @@ def main():
     #raw_data_reader = partial(RawDataReaderBACHTestSet, csv_file='/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/pred.csv')
     #############################################
 
+
     #################################
     # extract patches from raw images
     patch_extractor = DeepPatches  # only deep learning transformations
@@ -403,13 +411,15 @@ def main():
     # feature extraactor deep learning
     #weight_file = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ResNet50/81-best.pth' prostate
     #weight_file = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ResNet50/60-best.pth' # bach
-    weight_file = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/checkpoints/vggunet/183-best.pth' # bach
-    num_classes = 6
+    #weight_file = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/checkpoints/vggunet/183-best.pth' # bach
+    weight_file = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ResNet50/9-best.pth' # crc pannuke
+    num_classes = 6 # pannuke extended
     #num_classes = 5 # vggunet monsac datset
-    output_dim = None
+    #output_dim = None
+    output_dim = 16
     #deep_extractor = ExtractorResNet50(weight_file, num_classes, output_dim)
     #deep_extractor = None
-    deep_extractor = ExtractorVGG(weight_file, num_classes, output_dim)
+    #deep_extractor = ExtractorVGG(weight_file, num_classes, output_dim)
     ###############################
 
 
@@ -417,14 +427,14 @@ def main():
     writer = TorchWriter
 
 
-
     print('---------------------------')
-    patch_size = 71
-    patch_dataset = partial(patch_extractor, patch_size=patch_size, mean=mean, std=std)
+    patch_size = 64
+    #patch_size = 71 vggunet
+    #patch_dataset = partial(patch_extractor, patch_size=patch_size, mean=mean, std=std)
     #raw_data_reader = raw_data_reader(image_folder, json_folder, patch_dataset, return_mask=False)
-    raw_data_reader = raw_data_reader(image_folder, json_folder, patch_dataset, return_mask=True)
+    #raw_data_reader = raw_data_reader(image_folder, json_folder, patch_dataset, return_mask=True)
 
-    feat_pipline(raw_data_reader, deep_extractor, save_path, 1, writer)
+    #feat_pipline(raw_data_reader, deep_extractor, save_path, 1, writer)
 
     #######################################s######################################################
     #######################################s######################################################
@@ -435,13 +445,15 @@ def main():
     #cell_graph_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/hatnet2048dim/'
     #cell_graph_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/test/cgc16dim'
     #cell_graph_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_CGC16dim'
-    cell_graph_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/VGGUet_438dim'
+    #cell_graph_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/VGGUet_438dim'
+    cell_graph_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/PanNukeEx6classes/proto/fix_avg_cia_knn/'
     #cell_graph_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/cgc16dim'
     #cell_graph_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/test/hatnet2048dim/'
     # transforms
-    transforms = [avg_pooling]
+    transforms = [partial(avg_pooling, size=64)]
 
 
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/PanNukeEx6Classes/0'
 
     dataset = CellGraphPt(save_path, transforms=transforms)
     writer = CellGraphWriter(cell_graph_save_path)

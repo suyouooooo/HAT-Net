@@ -1,5 +1,5 @@
 import torch
-from torch.nn.functional import adaptive_avg_pool3d, adaptive_avg_pool2d
+from torch.nn.functional import adaptive_avg_pool3d, adaptive_avg_pool2d, adaptive_avg_pool1d
 
 
 def network(network_name, num_classes, pretrained):
@@ -71,10 +71,12 @@ class ExtractorResNet50:
     def __call__(self, images):
         with torch.no_grad():
             output = self.net(images.cuda())
-            output = output.unsqueeze(0)
+            B, C, _, _ = output.shape
+            output = output.reshape(B, C)
             if self.output_dim is not None:
+                output = output.reshape(1, B, C, 1, 1)
                 output = adaptive_avg_pool3d(output, (self.output_dim, 1, 1))
-            output = output.squeeze()
+                output = output.reshape(B, self.output_dim)
 
         return output.cpu().numpy()
 
@@ -123,31 +125,12 @@ class ExtractorVGG:
         return res
 
 
-
-        #self.net = network()
-        #path = ''
-        #print('Done.')
-
     def __call__(self, images):
-        #with torch.no_grad():
         output = self.extract_feature(images.cuda())
-        #output = self.net(images.cuda())
-        #output = output.unsqueeze(0)
-        #output = adaptive_avg_pool3d(output, (16, 1, 1))
-        #output = adaptive_avg_pool2d(output, (1, 1))
-        #print(output.shape)
-        #hand_feats = hand_feats.cuda()
-        #print(hand_feats.shape)
-        #output = torch.cat([hand_feats, output], dim=-1)
-        output = output.squeeze()
 
         if self.output_dim is not None:
-                #output = adaptive_avg_pool3d(output, (self.output_dim, 1, 1))
-        #if self.output_dim
             output = output.unsqueeze(0)
-            output = adaptive_avg_pool1d(output, (self.output_dim)).squeeze()
+            output = adaptive_avg_pool1d(output, (self.output_dim))
+            output = output.squeeze(0)
 
-
-        #print(output.shape)
-        #import sys;sys.exit()
         return output.cpu().numpy()

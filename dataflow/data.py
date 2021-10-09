@@ -15,7 +15,8 @@ from common.utils import FarthestSampler,filter_sampled_indice, sparse_to_dense,
 # from torch_geometric.utils import to_dense_adj, dense_to_sparse
 from setting import CrossValidSetting
 from .mean_std import MEAN_STD
-from datasets.prostate import TCGAProstate, CRC, TCGAProstateTestNormalize
+from datasets.prostate import TCGAProstate, TCGAProstateTestNormalize
+from datasets.crc import CRC
 
 
 _CROSS_VAL = {1:{'train':['fold_1', 'fold_2'], 'valid': ['fold_3']},
@@ -188,18 +189,18 @@ def get_ecrc_dataset(args):
     #std = torch.tensor([5.9021e+02, 2.4498e+00, 3.2903e-05, 1.6971e-05, 7.2713e-05, 7.7875e-05,
     #    4.6795e-05, 1.9148e-05, 2.1554e-05, 2.4778e-05, 4.6882e-05, 8.1360e-06,
     #    3.0058e-05, 1.7471e-05, 1.5239e-05, 1.5900e-05])
-    mean = torch.tensor([-0.0045, -0.0020, -0.0014,  0.0004,  0.0020, -0.0048,  0.0003, -0.0012,
-        -0.0006,  0.0018,  0.0005,  0.0012,  0.0013,  0.0009,  0.0017,  0.0019])
+    #mean = torch.tensor([-0.0045, -0.0020, -0.0014,  0.0004,  0.0020, -0.0048,  0.0003, -0.0012,
+    #    -0.0006,  0.0018,  0.0005,  0.0012,  0.0013,  0.0009,  0.0017,  0.0019])
 
-    std = torch.tensor([1.8510e-06, 1.5487e-06, 2.7994e-06, 1.7810e-06, 1.9513e-06, 1.6132e-06,
-        1.9129e-06, 1.5540e-06, 2.5018e-06, 1.6314e-06, 2.3036e-06, 1.0341e-06,
-        3.7000e-06, 4.4376e-06, 1.8439e-06, 4.0598e-06])
+    #std = torch.tensor([1.8510e-06, 1.5487e-06, 2.7994e-06, 1.7810e-06, 1.9513e-06, 1.6132e-06,
+    #    1.9129e-06, 1.5540e-06, 2.5018e-06, 1.6314e-06, 2.3036e-06, 1.0341e-06,
+    #    3.7000e-06, 4.4376e-06, 1.8439e-06, 4.0598e-06])
 
     cv = args.cross_val
 
     #mean = torch.tensor(_MEAN_CIA[int(cv)]).float()
     #std = torch.tensor(_STD_CIA[int(cv)]).float()
-    print('drop rate:')
+    #print('drop rate:')
     #if args.droprate == 0.5:
     #    print(args.droprate)
     #    train_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/drop50percentnodes', cv, 'train')
@@ -223,19 +224,34 @@ def get_ecrc_dataset(args):
     #test_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/VGGUet/', cv, 'test')
     #train_dataset = CRC('/data/hdd1/by/cell_graph/VGGUet', cv, 'train')
     #test_dataset = CRC('/data/hdd1/by/cell_graph/VGGUet', cv, 'test')
-    train_dataset = CRC('/data/hdd1/by/cpc_cell_graph/CPC', cv, 'train')
-    test_dataset = CRC('/data/hdd1/by/cpc_cell_graph/CPC', cv, 'test')
+    #train_dataset = CRC('/data/hdd1/by/cpc_cell_graph/CPC', cv, 'train')
+    #test_dataset = CRC('/data/hdd1/by/cpc_cell_graph/CPC', cv, 'test')
     #train_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/', cv, 'train')
     #test_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Fuse_64_dim16/', cv, 'test')
     #train_dataset = CRCLMDB('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Avg_64_LMDB/', cv, 'train')
     #test_dataset = CRCLMDB('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Avg_64_LMDB', cv, 'test')
     #train_dataset = CRC('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Avg_64/proto/fix_avg_cia_knn/0/', cv, 'train')
     #test_dataset = CRCLMDB('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Avg_64/proto/fix_avg_cia_knn/0/', cv, 'test')
+    path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/PanNukeEx6classes/proto/fix_avg_cia_knn/'
+    train_dataset = CRC(path, image_set='train', cv=cv)
+    test_dataset = CRC(path, image_set='test', cv=cv)
+    #cv2 = CRC(path, cv=2)
+    #cv3 = CRC(path, cv=3)
+    #if cv == 1:
+    #    train_dataset = torch.utils.data.ConcatDataset([cv2, cv3])
+    #    test_dataset = cv1
+    #elif cv == 2:
+    #    train_dataset = torch.utils.data.ConcatDataset([cv1, cv3])
+    #    test_dataset = cv2
+    #elif cv == 3:
+    #    train_dataset = torch.utils.data.ConcatDataset([cv1, cv2])
+    #    test_dataset = cv3
+
     print(len(train_dataset), len(test_dataset))
-    train_dataset.mean = mean
-    train_dataset.std = std
-    test_dataset.mean = mean
-    test_dataset.std = std
+    #train_dataset.mean = mean
+    #train_dataset.std = std
+    #test_dataset.mean = mean
+    #test_dataset.std = std
     train_set = DataLoader(train_dataset, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=True, pin_memory=True)
     test_set = DataLoader(test_dataset, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False, pin_memory=True)
 
@@ -689,6 +705,10 @@ def prepare_train_val_loader(args):
 
     if args.task == 'ECRC':
         return get_ecrc_dataset(args)
+
+    if args.task == 'CRC':
+        return get_ecrc_dataset(args)
+
 
     if args.task == 'BACH':
         return get_bach_dataset(args)

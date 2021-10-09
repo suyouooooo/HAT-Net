@@ -5,6 +5,8 @@ from torch_cluster import grid_cluster
 import math
 import re
 
+from concurrent.futures import ThreadPoolExecutor
+from itertools import repeat
 
 #class Dummy:
 #    def __init__(self, aa):
@@ -127,7 +129,6 @@ def fix_name(basename, gt):
     #    data.y = torch.tensor(cls_id)
     #    print(data.y)
 
-import sys; sys.exit()
 
 
 import re
@@ -300,24 +301,52 @@ def slice_image(image, h=4, w=4):
 #res = slice_image(img)
 #print(len(res))
 
-#import cv2
-#import math
+class ImageWriter:
+    def __init__(self, save_path):
+        self.save_path = save_path
+        self.pool = ThreadPoolExecutor.pool(8)
+
+
+        #for idx, patch in enumerate(patches):
+
+    def write(self, path, patches):
+        idx = range(len(patches))
+        path = repeat(path)
+        self.pool.map(self.write_file, zip(dix, path, patches))
+
+    def write_file(self, idx, i, patch):
+            basename = os.path.basename(i)
+            basename = basename.replace('.png', '_{}.png'.format(idx))
+            #print(basename)
+            path = os.path.join(self.save_path, basename)
+            #print(path, patch.shape)
+            cv2.imwrite(path, patch)
+
+
+import cv2
+import math
 #src_path = '/data/smb/syh/colon_dataset/CRC_Dataset'
+src_path = '/data/smb/数据集/结直肠/病理学/Extended_CRC/Original_Images/'
 ##save_path = 'crc_sliced'
 #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/SliceImage'
-#count = 0
+save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/SliceImage'
+count = 0
+#imgwriter = ImageWriter(save_path)
 #for i in glob.iglob(os.path.join(src_path, '**', '*.png'), recursive=True):
 #    count += 1
 #    image = cv2.imread(i)
 #    patches = slice_image(image)
+#    #imgwriter.write(i, patches)
 #    for idx, patch in enumerate(patches):
 #        basename = os.path.basename(i)
 #        basename = basename.replace('.png', '_{}.png'.format(idx))
 #        #print(basename)
 #        path = os.path.join(save_path, basename)
-#        print(path)
+#        #print(path, patch.shape)
 #        cv2.imwrite(path, patch)
 #        #print(path)
+#
+#import sys; sys.exit()
 
 
 #import torch
@@ -408,3 +437,80 @@ print('here')
 #a = num_nodes('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Avg_64/')
 #print(a)
 #print(remove_files('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images/Patches_Binary') / 1024 / 1024 / 1024, 'Gbytes')
+
+class PanNuke:
+    def __init__(self, path):
+        self.path = path
+        search_path = os.path.join(path, '*', '*.npy')
+        for i in glob.iglob(search_path, recursive=True):
+            if 'images.npy' in os.path.basename(i):
+                self.images = np.load(i, mmap_mode='r')
+            if 'masks.npy' in os.path.basename(i):
+                self.masks = np.load(i, mmap_mode='r')
+            if 'types.npy' in os.path.basename(i):
+                self.types = np.load(i, mmap_mode='r')
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx):
+        return self.images[idx], self.masks[idx], self.types[idx]
+
+def dilate(mask):
+    kernel = np.ones((3, 3), np.uint8)
+    #print(mask.shape, 9999999)
+    #print(mask.dtype)
+    #dal = cv2.dilate(mask.astype('uint8'), kernel, iterations=4)
+    dal = cv2.dilate(mask, kernel, iterations=4)
+    #print(np.unique(dal))
+    #print(dal.shape, mask.shape)
+    tmp_mask = np.bitwise_xor(mask > 0, dal > 0)
+    #print(np.unique(mask), 111)
+    #tmp = image.copy()
+    #print(tmp_mask.shape, 11111111)
+    #tmp[tmp_mask != 0, :] = 0
+    return tmp_mask
+
+def overlay(image, mask):
+    image = image.copy()
+    #img.setflags(write=1)
+    color0 = (255, 0, 0)[::-1]
+    color1 = (255, 94, 0)[::-1]
+    color2 = (103, 181, 85)[::-1]
+    color3 = (255, 255, 49)[::-1]
+    color4 = (255, 0, 252)[::-1]
+    #color5 = (145, 132, 80)[::-1]
+    mask0 = dilate(mask[:, :, 0])
+    mask1 = dilate(mask[:, :, 1])
+    mask2 = dilate(mask[:, :, 2])
+    mask3 = dilate(mask[:, :, 3])
+    mask4 = dilate(mask[:, :, 4])
+    #mask5 = dilate(mask[:, :, 5]) #bg
+    #print(mask.shape)
+
+    image[mask0] = color0
+    image[mask1] = color1
+    image[mask2] = color2
+    image[mask3] = color3
+    image[mask4] = color4
+    #image[mask5] = color5
+
+    return image
+
+
+path = '/data/smb/syh/colon_dataset/PanukeEx/cancer-instance-segmentation-and-classification-2'
+dataset = PanNuke(path)
+
+print(len(dataset))
+
+count = 0
+for i in dataset:
+    count += 1
+    #i = dataset[144]
+    image, mask, type_id = i
+    #print(image.shape)
+    #print(mask.shape)
+    image = overlay(image, mask)
+    #print(type_id)
+    cv2.imwrite('pannuke_overlay/{}_{}.jpg'.format(type_id, count), image)
+    #break

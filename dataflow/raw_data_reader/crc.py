@@ -17,10 +17,19 @@ class RawDataReaderCRC:
         for image_name in glob.iglob(search_path, recursive=True):
             if 'mask' in image_name:
                 continue
+
+        #fold_2/2_low_grade/
+            if 'fold_2' not in image_name:
+                continue
+            if '2_low_grade' not in image_name:
+                continue
             self.image_names.append(image_name)
 
         self.dataset = dataset
         print(len(self.image_names))
+        #for i in self.image_names:
+            #print(i)
+        #import sys; sys.exit()
 
     def __len__(self):
         return len(self.image_names)

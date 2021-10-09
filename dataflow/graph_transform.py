@@ -8,8 +8,8 @@ from torch_geometric.nn.pool.pool import pool_pos
 def _avg_pool_x(cluster, x, size=None):
     return scatter(x, cluster, dim=0, dim_size=size, reduce='mean')
 
-def avg_pooling(data):
-    cluster = grid_cluster(data.pos, torch.tensor([32, 32]))
+def avg_pooling(data, size):
+    cluster = grid_cluster(data.pos, torch.tensor([size, size])) # for crc 64 is 32
     cluster, perm = consecutive_cluster(cluster)
     x = None if data.x is None else _avg_pool_x(cluster, data.x)
     pos = None if data.pos is None else pool_pos(cluster, data.pos)
