@@ -479,7 +479,7 @@ class HatNet(nn.Module):
         super().__init__()
         #num_nodes = num_nodes
         #print(num_nodes)
-        ratio = 0.4
+        ratio = 0.5
         num_nodes = int(ratio * num_nodes)
         print(num_nodes)
         self.pos_emb1 = nn.Parameter(torch.randn(1, num_nodes, dim))

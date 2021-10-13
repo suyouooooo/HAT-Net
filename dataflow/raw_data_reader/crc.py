@@ -19,10 +19,10 @@ class RawDataReaderCRC:
                 continue
 
         #fold_2/2_low_grade/
-            if 'fold_2' not in image_name:
-                continue
-            if '2_low_grade' not in image_name:
-                continue
+            #if 'fold_2' not in image_name:
+            #    continue
+            #if '2_low_grade' not in image_name:
+            #    continue
             self.image_names.append(image_name)
 
         self.dataset = dataset

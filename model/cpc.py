@@ -1019,12 +1019,14 @@ class FullVisionModel(torch.nn.Module):
                 self.encoder[self.opt.train_module].calc_loss = calc_loss
 
 
-def network():
+def network(weight_file):
     opt = pickle.load(open('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/checkpoints/opt.pkl', 'rb'))
     print(opt)
     model = FullVisionModel(opt, True)
     #model = torch.nn.DataParallel(model)
-    data = torch.load('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/checkpoints/model_0_22.ckpt')
+    #data = torch.load('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/checkpoints/model_0_22.ckpt')
+    data = torch.load(weight_file)
+    #data = torch.load('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/checkpoints/model_0_22.ckpt')
     new_state_dict = OrderedDict()
     #print('ffffffffffffff')
     for k, v in data.items():
@@ -1041,6 +1043,7 @@ def network():
         #print(key)
     model.model = None
     model.autoregressor = None
+    #print(model)
 
     return model
 

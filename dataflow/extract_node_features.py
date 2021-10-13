@@ -1560,10 +1560,10 @@ def generate_features(dataloader, num_feats, rel_pathes, writer, extractor):
     #print(count / (time.time() - start))
 
 class ExtractorCPC:
-    def __init__(self):
+    def __init__(self, weight_file):
         from model.cpc import network
         #print('loading weight file {}...'.format(path))
-        self.net = network()
+        self.net = network(weight_file)
         #path = ''
         #self.net.load_state_dict(torch.load(path))
         #print('Done.')

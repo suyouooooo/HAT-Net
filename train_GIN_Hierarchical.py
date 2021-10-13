@@ -274,6 +274,10 @@ def train(dataset, model, args,  val_dataset=None, test_dataset=None, writer=Non
 
                 early_stop.update(val_result['img_acc'])
 
+                if val_result['img_acc'] == 1:
+                    print('img_acc is 1, stopping...')
+                    import sys; sys.exit()
+
 
         #print('training set acc:')
         #val_result = evaluate(dataset, model, args, name='Validation')

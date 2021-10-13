@@ -77,6 +77,7 @@ class CRC(Dataset):
             #'/data/hdd1/by/HGIN/acc872_prostate_5cropsAug/std.npy' # 87.2 withtypes
             os.path.join(root, 'num_nodes.npy')
         ))
+        print(self.root)
 
 
     def filepath(self):
@@ -99,6 +100,7 @@ class CRC(Dataset):
         #data.x = data.x.float()
 
         data.x = self.normalize(data.x).float()
+        #data.x = self.normalize_tmp(data.x).float()
         #print(data.x.max(), data.x.min())
 
         #print(data.x.shape)
@@ -108,6 +110,10 @@ class CRC(Dataset):
         #data.x[torch.isinf(data.x)] = 0
 
         return data
+
+    def normalize_tmp(self, x):
+        x = (x - self.mean) / self.std
+        return x
 
     def normalize(self, x):
         #print(x.max(), x.min())

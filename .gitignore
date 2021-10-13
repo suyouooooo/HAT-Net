@@ -306,3 +306,11 @@ crc_pannuke_cv3
 gen_crc
 gen_crc2
 gen_ecrc
+Miniconda3-py39_4.9.2-Linux-x86_64.sh
+add_pool_cv1_cv2_cv3
+avg128x128_cv3
+avg_pool128_cv1_cv2_cv3
+compute_ecrc_mean_std
+crc_vggunet_cv2
+gen_compute_mean_add_pool
+gen_crc_avgpool_128x128

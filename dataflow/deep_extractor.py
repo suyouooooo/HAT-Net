@@ -134,3 +134,35 @@ class ExtractorVGG:
             output = output.squeeze(0)
 
         return output.cpu().numpy()
+
+class ExtractorCPC:
+    def __init__(self, weight_file, num_classes, output_dim=None):
+        from model.cpc import network
+        #print('loading weight file {}...'.format(path))
+        self.net = network(weight_file)
+        #path = ''
+        #self.net.load_state_dict(torch.load(path))
+        #print('Done.')
+        self.net = self.net.cuda()
+        self.net = torch.nn.DataParallel(self.net)
+        self.num_classes = num_classes
+        self.output_dim = output_dim
+
+    def __call__(self, images):
+        with torch.no_grad():
+            output = self.net(images.cuda())
+            B, C, _, _ = output.shape
+            #output = output.unsqueeze(0)
+            output = adaptive_avg_pool2d(output, (1, 1))
+            #output = output.squeeze()
+            output = output.reshape(B, C)
+
+            if self.output_dim is not None:
+                output = output.unsqueeze(0)
+                output = adaptive_avg_pool1d(output, (self.output_dim))
+                output = output.squeeze(0)
+                #print(output.shape)
+
+
+
+        return output.cpu().numpy()
