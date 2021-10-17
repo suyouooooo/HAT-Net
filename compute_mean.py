@@ -2,6 +2,7 @@ import os
 import random
 import glob
 import time
+import argparse
 
 import numpy as np
 
@@ -154,7 +155,7 @@ def dataset_stats(pathes):
 #path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops'
 #path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_CPC/'
 #path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/ImageNetPretrain/'
-def main():
+def main(args):
     #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug'
     #data_path = 'acc872_prostate_5cropsAug/'
     #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/hatnet2048dim/'
@@ -166,7 +167,12 @@ def main():
     #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_add_cia_knn/'
     #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_avg_cia_knn/'
     #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_Avg_64/proto/fix_avg_cia_knn/'
-    data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_avg_cia_knn_128x128/'
+    #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_avg_cia_knn_128x128/'
+    #data_path = 'fix_avg_cia_knn_256x256'
+    #data_path = 'fix_avg_cia_knn_512x512/'
+    #data_path = 'fix_avg_cia_knn_1024x1024/'
+    #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_fuse_cia_knn/0/'
+    data_path = args.path
     #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/hatnet128dim/'
     #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/hatnet32dim/'
     #data_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/cgc16dim/'
@@ -216,7 +222,13 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+
+    parser = argparse.ArgumentParser()
+    ## yihan
+    ##
+    parser.add_argument('--path', required=True, type=str)
+    args = parser.parse_args()
+    main(args)
 #sub_folder = ['fold_1', 'fold_2', 'fold_3']
 #mean = {
 #    1:np.array([0] * 18),

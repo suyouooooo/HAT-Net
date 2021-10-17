@@ -579,6 +579,8 @@ def avg_pooling(data):
     pos = None if data.pos is None else pool_pos(cluster, data.pos)
     data.x = x
     data.pos = pos
+    print(data.x.shape)
+    import sys; sys.exit()
 
     return data
 

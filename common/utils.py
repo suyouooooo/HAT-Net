@@ -385,6 +385,8 @@ class Metric:
 
             correct += pred == label
             total += 1
+            if pred != label:
+                print(key, value)
 
             #if label == 0:
             #    if pred == label:

@@ -1,3 +1,5 @@
+import random
+
 import torch
 from torch_cluster import grid_cluster
 from torch_scatter import scatter
@@ -15,5 +17,17 @@ def avg_pooling(data, size):
     pos = None if data.pos is None else pool_pos(cluster, data.pos)
     data.x = x
     data.pos = pos
+    #print(data.x.shape)
+    #import sys; sys.exit()
+
+    return data
+
+def random_sample(data, sampled_nodes):
+    num_nodes = data.x.shape[0]
+    node_id = random.sample(range(num_nodes), k=sampled_nodes)
+    data.x = data.x[node_id]
+    data.pos = data.pos[node_id]
+    #print(data)
+    #import sys; sys.exit()
 
     return data

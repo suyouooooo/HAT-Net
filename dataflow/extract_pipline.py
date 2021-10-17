@@ -17,7 +17,7 @@ from skimage.filters.rank import entropy as Entropy
 from skimage.morphology import disk
 from common.nuc_feature import nuc_stats_new,nuc_glcm_stats_new
 import sys
-from dataflow.graph_transform import avg_pooling
+from dataflow.graph_transform import avg_pooling, random_sample
 #sys.setrecursionlimit(1000)
 
 
@@ -138,8 +138,8 @@ class CellGraphWriter:
         #print(111,  save_path)
         #print(data)
         #sys.exit()
-        if len(data.x) <= 5:
-            return
+        #if len(data.x) <= 5:
+        #    return
 
         #print(save_path)
         #print(save_path)
@@ -153,7 +153,8 @@ class CellGraphWriter:
     def write_batch(self, batch):
         self.thread_pool.map(
             self.write_sample,
-            [batch[i] for i in range(batch.num_graphs)]
+            #[batch[i] for i in range(batch.num_graphs)]
+            batch.to_data_list()
         )
 
 
@@ -372,8 +373,8 @@ def main():
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat/5Crops_Aug_CGC16dim'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/VGGUet_438dim'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/PanNukeEx6Classes'
-    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/feature/CRC/'
-    save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/CPC_1036'
+    save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/feature/CRC/'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/CPC_1036'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Feat_Aug/cgc16dim/'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Feat/test/hatnet2048dim'
 
@@ -431,7 +432,7 @@ def main():
     #deep_extractor = ExtractorResNet50(weight_file, num_classes, output_dim)
     #deep_extractor = None
     #deep_extractor = ExtractorVGG(weight_file, num_classes, output_dim)
-    deep_extractor = ExtractorCPC(weight_file, num_classes, output_dim)
+    #deep_extractor = ExtractorCPC(weight_file, num_classes, output_dim)
     ###############################
 
 
@@ -442,11 +443,11 @@ def main():
     print('---------------------------')
     patch_size = 64
     #patch_size = 71 vggunet
-    patch_dataset = partial(patch_extractor, patch_size=patch_size, mean=mean, std=std)
-    #raw_data_reader = raw_data_reader(image_folder, json_folder, patch_dataset, return_mask=False)
-    raw_data_reader = raw_data_reader(image_folder, json_folder, patch_dataset, return_mask=True)
+    #patch_dataset = partial(patch_extractor, patch_size=patch_size, mean=mean, std=std)
+    ##raw_data_reader = raw_data_reader(image_folder, json_folder, patch_dataset, return_mask=False)
+    #raw_data_reader = raw_data_reader(image_folder, json_folder, patch_dataset, return_mask=True)
 
-    feat_pipline(raw_data_reader, deep_extractor, save_path, 1, writer)
+    #feat_pipline(raw_data_reader, deep_extractor, save_path, 1, writer)
 
     #######################################s######################################################
     #######################################s######################################################
@@ -463,15 +464,23 @@ def main():
     #cell_graph_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/test/hatnet2048dim/'
     #cell_graph_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_avg_cia_knn_128x128/'
     #cell_graph_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/CPC_1036'
-    cell_graph_save_path = 'CPC_1036'
+    #cell_graph_save_path = 'CPC_1036'
+    #cell_graph_save_path = 'fix_avg_cia_knn_256x256/'
+    #cell_graph_save_path = 'fix_avg_cia_knn_512x512'
+    #cell_graph_save_path = 'fix_avg_cia_knn_1024x1024'
+    #cell_graph_save_path = 'fix_avg_cia_knn_1792x1792'
+    cell_graph_save_path = 'fix_random_knn_1'
     # transforms
-    transforms = [partial(avg_pooling, size=64)]
+    print(cell_graph_save_path)
+    #transforms = [partial(avg_pooling, size=64 * 2 * 2 * 2 * 2)]
+    #transforms = [partial(avg_pooling, size=1792 * 2)]
+    transforms = [partial(random_sample, sampled_nodes=1)]
 
 
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/PanNukeEx6Classes/0'
 
-    dataset = CellGraphPt(save_path, transforms=transforms)
-    #dataset = CellGraphNpy(save_path, transforms=transforms)
+    #dataset = CellGraphPt(save_path, transforms=transforms)
+    dataset = CellGraphNpy(save_path, transforms=transforms)
     writer = CellGraphWriter(cell_graph_save_path)
     cell_graph_pipline(dataset, writer)
 

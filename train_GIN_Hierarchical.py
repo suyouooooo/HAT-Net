@@ -15,7 +15,7 @@ import time
 from common.utils import mkdirs, save_checkpoint, load_checkpoint, init_optim, output_to_gexf, Metric, EarlyStopping
 from torch.optim import lr_scheduler
 from model import network_GIN_Hierarchical, network_CGCNet
-from model.network_GIN_baiyu import HatNet, Prostate
+from model.network_GIN_baiyu import HatNet, Prostate, HatNetC
 from torch_geometric.nn import DataParallel
 from torch_geometric.utils import dropout_adj
 from dataflow.data import prepare_train_val_loader
@@ -320,7 +320,8 @@ def cell_graph(args, writer = None):
         #model = Prostate(1036, 64, args.num_classes)
 
         #model = HatNet(input_dim, 64, args.num_classes, num_nodes=num_nodes)
-        model = HatNet(input_dim, args.hidden_dim, args.num_classes, num_nodes=num_nodes)
+        #model = HatNet(input_dim, args.hidden_dim, args.num_classes, num_nodes=num_nodes)
+        model = HatNetC(input_dim, args.hidden_dim, args.num_classes, num_nodes=num_nodes)
         #model = network_GIN_Hierarchical.SoftPoolingGcnEncoder(setting.max_num_nodes,
         #    input_dim, args.hidden_dim, args.output_dim, True, True, args.hidden_dim,  args.num_classes,
         #                                      args.assign_ratio,[50], concat= True,
@@ -428,7 +429,7 @@ def arg_parse():
                         help='[c, ca, cal, cl] c: coor, a:appearance, l:soft-label')
     parser.add_argument('--input-dim', dest='input_dim', type=int,
                         help='Input feature dimension')
-    parser.add_argument('--hidden-dim', dest='hidden_dim', type=int,
+    parser.add_argument('--hidden_dim', dest='hidden_dim', type=int,
                         help='Hidden dimension')
     parser.add_argument('--output-dim', dest='output_dim', type=int,
                         help='Output dimension')
@@ -492,6 +493,7 @@ def arg_parse():
     parser.add_argument('--jk_tec', default='lstm', type=str)
     parser.add_argument('--pool_tec', default='mincut', type=str)
     parser.add_argument('--droprate', default=0.0, type=float)
+    parser.add_argument('--path', default='', type=str)
 
     parser.set_defaults(datadir=data_setting.root,
                         logdir=data_setting.log_path,

@@ -39,12 +39,13 @@ class CRC(Dataset):
         #self.std = torch.tensor(std)
         self.mean = torch.tensor(np.load(
             os.path.join(root, 'mean.npy') # 87.2 withtypes
-        ))
+        ))[:16]
+        print(root)
         self.std = torch.tensor(np.load(
             #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_CPC/std.npy'
             #'/data/hdd1/by/HGIN/acc872_prostate_5cropsAug/std.npy' # 87.2 withtypes
             os.path.join(root, 'std.npy')
-        ))
+        ))[:16]
         #self.min = torch.tensor(np.load(
         #    '/data/hdd1/by/HGIN/acc872_prostate_5cropsAug/stats/min.npy'
         #))
@@ -64,12 +65,12 @@ class CRC(Dataset):
             #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_CPC/std.npy'
             #'/data/hdd1/by/HGIN/acc872_prostate_5cropsAug/std.npy' # 87.2 withtypes
             os.path.join(root, 'min.npy')
-        ))
+        ))[:16]
         self.max = torch.tensor(np.load(
             #'/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_CPC/std.npy'
             #'/data/hdd1/by/HGIN/acc872_prostate_5cropsAug/std.npy' # 87.2 withtypes
             os.path.join(root, 'max.npy')
-        ))
+        ))[:16]
 
         #self.num_nodes = 2271
         self.num_nodes = torch.tensor(np.load(
@@ -90,6 +91,7 @@ class CRC(Dataset):
         fp = self.file_names[idx]
         #print(fp)
         data = torch.load(fp)
+        data.x = data.x[:, :16]
         #deg = degree(data.edge_index[0])
         #print(deg.max(), 33333333)
         if self.transforms is not None:
@@ -118,6 +120,7 @@ class CRC(Dataset):
     def normalize(self, x):
         #print(x.max(), x.min())
         diff = self.max - self.min + self.eps # avoid 0 division
+        #print(x.shape, self.min.shape)
         x = x - self.min  # larger than 0
         assert (x < 0).sum() == 0
         mean = self.mean - self.min

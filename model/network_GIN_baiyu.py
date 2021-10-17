@@ -3,7 +3,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GINConv, DenseGINConv, dense_mincut_pool, global_add_pool, global_mean_pool, global_max_pool, GCNConv, SAGPooling, SAGEConv
+from torch_geometric.nn import GINConv, DenseGINConv, dense_mincut_pool, global_add_pool, global_mean_pool, global_max_pool, GCNConv, SAGPooling, SAGEConv, JumpingKnowledge
 from torch_geometric.utils import to_dense_batch, to_dense_adj, degree
 import torch_geometric
 from torch_cluster import grid_cluster
@@ -833,34 +833,46 @@ class Prostate(nn.Module):
 #        #import sys; sys.exit()
 #        return x, loss
 #
-
-
-class HatNetNew(nn.Module):
+class HatNetC(nn.Module):
     def __init__(self, in_channels, dim, out_channels, num_nodes=548):
     #def __init__(self, in_channels, dim, out_channels, num_nodes=2109):
         super().__init__()
         #num_nodes = num_nodes
         #print(num_nodes)
-        num_nodes = int(0.5 * num_nodes)
-        #print(num_nodes)
-        self.pos_emb1 = nn.Parameter(torch.randn(1, num_nodes, dim))
+        ratio = 0.5
+        num_nodes = int(ratio * num_nodes)
+        print(num_nodes)
+        #self.pos_emb1 = nn.Parameter(torch.randn(1, num_nodes, dim))
 
-        encoder_layer = nn.TransformerEncoderLayer(d_model=dim, nhead=8)
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=dim,
+            nhead=2,
+            #nhead=8,
+            #dim_feedforward=dim * 4)
+            #dim_feedforward=2048)
+            #dim_feedforward=dim)
+            dim_feedforward=dim)
+
         self.pool1 = nn.Linear(dim, num_nodes)
-        num_nodes = int(0.5 * num_nodes)
-        self.pos_emb2 = nn.Parameter(torch.randn(1, num_nodes, dim))
+        num_nodes = int(ratio * num_nodes)
+        #self.pos_emb2 = nn.Parameter(torch.randn(1, num_nodes, dim))
         #print(num_nodes)
         #import sys; sys.exit()
+        #num_nodes = int(ratio * num_nodes)
         self.pool2 = nn.Linear(dim, num_nodes)
+
+        num_nodes = int(ratio * num_nodes)
+        self.pool3 = nn.Linear(dim, num_nodes)
+        #self.split_trans = SplitTrans(encoder_layer, dim)
 
         #self.conv1 = GINConv(
         #    nn.Sequential(nn.Linear(in_channels, dim), nn.BatchNorm1d(dim), nn.ReLU(),
         #               nn.Linear(dim, dim), nn.ReLU()))
         self.conv1 = GINConv(NN(in_channels, dim))
-        self.conv2 = GINConv(NN(dim, dim))
+        #self.conv2 = GINConv(NN(dim, dim))
+        self.conv2 = DenseGINConv(NN(dim, dim))
         self.conv3 = DenseGINConv(NN(dim, dim))
-        self.conv4 = DenseGINConv(NN(dim, dim))
-        self.conv5 = DenseGINConv(NN(dim, dim))
+        #self.conv5 = DenseGINConv(NN(dim, dim))
 
         self.trans1 = nn.TransformerEncoder(encoder_layer, num_layers=6)
         self.trans2 = nn.TransformerEncoder(encoder_layer, num_layers=6)
@@ -882,70 +894,127 @@ class HatNetNew(nn.Module):
 
         #self.trans1 = nn.Transformer(d_model=dim, num_decoder_layers=0, num_encoder_layers=6)
         #self.trans2 = nn.Transformer(d_model=dim, num_decoder_layers=0, num_encoder_layers=6)
-        self.fc1 = nn.Sequential(nn.Linear(dim * 21, dim * 21 // 4), nn.BatchNorm1d(dim * 21 // 4), nn.ReLU())
+        #ratio = 21
+        ratio = 3
+        self.fc1 = nn.Sequential(nn.Linear(dim, dim), nn.BatchNorm1d(dim), nn.ReLU())
         #self.fc1 = nn.Sequential(nn.Linear(dim * 15, dim * 15 // 4), nn.BatchNorm1d(dim * 15 // 4), nn.ReLU())
         self.dropout = nn.Dropout()
         #self.fc2 = nn.Linear(dim * 15 // 4, out_channels)
-        self.fc2 = nn.Linear(dim * 21 // 4, out_channels)
+        self.fc2 = nn.Linear(dim , out_channels)
+        self.jk = JumpingKnowledge('lstm', dim, 3)
+
+    #def test_deg(self, data):
+        #for i in data:
+            #print(i)
+
+        #for i in range(data.num_graphs):
+        #    deg = degree(data.edge_index[0], data.num_nodes)
+        #    print(deg.max())
+
+    #def on_load_checkpoint(self, checkpoint: dict) -> None:
+    #    state_dict = checkpoint["state_dict"]
+    #    model_state_dict = self.state_dict()
+    #    is_changed = False
+    #    for k in state_dict:
+    #        if k in model_state_dict:
+    #            if state_dict[k].shape != model_state_dict[k].shape:
+    #                print(f"Skip loading parameter: {k}, "
+    #                            f"required shape: {model_state_dict[k].shape}, "
+    #                            f"loaded shape: {state_dict[k].shape}")
+    #                state_dict[k] = model_state_dict[k]
+    #                is_changed = True
+    #        else:
+    #            print(f"Dropping parameter {k}")
+    #            is_changed = True
+
+    #    if is_changed:
+    #        checkpoint.pop("optimizer_states", None)
 
     def forward(self, data):
-        x, edge_index, batch = data.x, data.edge_index, data.batch
+        #self.test_deg(data)
+        #deg = degree(data.edge_index[0], data.num_nodes)
+        #print(deg.max(), 222222222)
+        #x, edge_index, batch = data.x, data.edge_index, data.batch
+        #print(data.edge_index[0].shape, data.num_nodes)
 
         outputs = []
-        x = self.conv1(x, edge_index)
-        outputs.append(global_add_pool(x, batch))
-        outputs.append(global_mean_pool(x, batch))
-        outputs.append(global_max_pool(x, batch))
+        # stage 1
+        data.x = self.conv1(data.x, data.edge_index)
+        #outputs.append(global_add_pool(data.x, data.batch))
+        #outputs.append(global_mean_pool(data.x, data.batch))
+        #outputs.append(global_max_pool(data.x, data.batch))
 
-        x = self.conv2(x, edge_index)
-        outputs.append(global_add_pool(x, batch))
-        outputs.append(global_mean_pool(x, batch))
-        outputs.append(global_max_pool(x, batch))
+        #data.x = self.conv2(data.x, data.edge_index)
+        #outputs.append(global_add_pool(data.x, data.batch))
+        #outputs.append(global_mean_pool(data.x, data.batch))
+        #outputs.append(global_max_pool(data.x, data.batch))
 
+        x, edge_index, batch = data.x, data.edge_index, data.batch
         x, mask = to_dense_batch(x, batch)
-        #print(x.shape, mask.shape)
-        #print(x[mask].shape)
-        #import sys; sys.exit()
         adj = to_dense_adj(edge_index, batch)
+
         s = self.pool1(x)
         x, adj, mc1, o1 = dense_mincut_pool(x, adj, s, mask)
-        outputs.append(torch.mean(x, dim=1))
-        outputs.append(torch.sum(x, dim=1))
-        outputs.append(torch.max(x, dim=1)[0])
-
-        x = self.conv3(x, adj)
-        outputs.append(torch.mean(x, dim=1))
-        outputs.append(torch.sum(x, dim=1))
-        outputs.append(torch.max(x, dim=1)[0])
-
-        x = self.conv4(x, adj)
-        #print(x.shape, 11)
-        x += self.pos_emb1
-        x = self.trans1(x)
-
-        outputs.append(torch.mean(x, dim=1))
-        outputs.append(torch.sum(x, dim=1))
+        #outputs.append(torch.mean(x, dim=1))
+        #outputs.append(torch.sum(x, dim=1))
         outputs.append(torch.max(x, dim=1)[0])
 
 
+        # stage 2 ####################################
+
+        x = self.conv2(x, adj)
         s = self.pool2(x)
         x, adj, mc2, o2 = dense_mincut_pool(x, adj, s)
-        #print(x.shape) # 267
-        outputs.append(torch.mean(x, dim=1))
-        outputs.append(torch.sum(x, dim=1))
+        x = x.permute(1, 0, 2)
+        x = self.trans1(x)
+        x = x.permute(1, 0, 2)
+        #outputs.append(torch.mean(x, dim=1))
+        #outputs.append(torch.sum(x, dim=1))
         outputs.append(torch.max(x, dim=1)[0])
+        # end stage 2 ####################################
 
-        x = self.conv5(x, adj)
-        x += self.pos_emb2
-        x = self.trans2(x)
-        #print(x.shape) # 267
+        # stage 3 ####################################
+        x = self.conv3(x, adj)
+        s = self.pool3(x)
+        x, adj, mc2, o2 = dense_mincut_pool(x, adj, s)
+        x = x.permute(1, 0, 2)
+        x = self.trans1(x)
+        x = x.permute(1, 0, 2)
+
+        #x = self.conv4(x, adj)
+        ##x += self.pos_emb1
+        #x = x.permute(1, 0, 2)
+        #x = self.trans1(x)
+        #x = x.permute(1, 0, 2)
+
+        #outputs.append(torch.mean(x, dim=1))
+        #outputs.append(torch.sum(x, dim=1))
+        outputs.append(torch.max(x, dim=1)[0])
+        # end stage 3 ####################################
+
+
+        #s = self.pool2(x)
+        #x, adj, mc2, o2 = dense_mincut_pool(x, adj, s)
+        ##print(x.shape) # 267
+        ##outputs.append(torch.mean(x, dim=1))
+        ##outputs.append(torch.sum(x, dim=1))
+        ##outputs.append(torch.max(x, dim=1)[0])
+
+        #x = self.conv5(x, adj)
+        ##x += self.pos_emb2
+        #x = x.permute(1, 0, 2)
+        ##print(x.shape)
+        #x = self.trans2(x)
+        #x = x.permute(1, 0, 2)
+        #print(x.shape)
         #import sys; sys.exit()
-        outputs.append(torch.mean(x, dim=1))
-        outputs.append(torch.sum(x, dim=1))
-        outputs.append(torch.max(x, dim=1)[0])
+        #outputs.append(torch.mean(x, dim=1))
+        #outputs.append(torch.sum(x, dim=1))
+        #outputs.append(torch.max(x, dim=1)[0])
 
-        x = torch.cat(outputs, dim=1)
-        #print(x.shape, self.fc1)
+        #x = torch.cat(outputs, dim=1)
+        x = self.jk(outputs)
+        #print(x.shape)
         x = self.fc1(x)
         x = self.dropout(x)
         x = self.fc2(x)

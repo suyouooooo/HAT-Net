@@ -36,7 +36,7 @@ def gen_cell_graph(data):
     #subdata = copy.deepcopy(data)
     subdata = data.clone()
 
-    edge_index = radius_graph(subdata.pos, 100, None, True, 8)
+    edge_index = radius_graph(subdata.pos, 1000, None, True, 8)
        #else:
        #    edge_index = random_sample_graph2(choice, distance, 100, True,
                                      #n_sample=8,sparse=True)

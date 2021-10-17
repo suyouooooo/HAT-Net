@@ -235,8 +235,15 @@ def get_ecrc_dataset(args):
     #path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/PanNukeEx6classes/proto/fix_avg_cia_knn/'
     #path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_add_cia_knn/'
     #path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_add_cia_knn/'
+    #path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_avg_cia_knn'`
+    #path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_fuse_cia_knn/0/'
+    #path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_fuse_cia_knn/0/'
+    path = args.path
     #path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_avg_cia_knn_128x128/'
-    path = 'fix_avg_cia_knn_128x128'
+    #path = 'fix_avg_cia_knn_128x128'
+    #path = 'fix_avg_cia_knn_256x256'
+    #path = 'fix_avg_cia_knn_512x512/'
+    #path = 'fix_avg_cia_knn_1024x1024'
     #path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/VGGUet_438dim/'
     train_dataset = CRC(path, image_set='train', cv=cv)
     test_dataset = CRC(path, image_set='test', cv=cv)

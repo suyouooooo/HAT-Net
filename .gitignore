@@ -314,3 +314,10 @@ compute_ecrc_mean_std
 crc_vggunet_cv2
 gen_compute_mean_add_pool
 gen_crc_avgpool_128x128
+avg256x256_cv1_cv2_cv3
+avg_pool1024_cv1_cv2_cv3
+avg_pool512_cv1_cv2_cv3
+avg_pool_size1
+conference_paper_fuse
+gen_daaaa
+train_dropout
