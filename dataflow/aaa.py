@@ -461,7 +461,7 @@ def dilate(mask):
     #print(mask.shape, 9999999)
     #print(mask.dtype)
     #dal = cv2.dilate(mask.astype('uint8'), kernel, iterations=4)
-    dal = cv2.dilate(mask, kernel, iterations=4)
+    dal = cv2.dilate(mask, kernel, iterations=2)
     #print(np.unique(dal))
     #print(dal.shape, mask.shape)
     tmp_mask = np.bitwise_xor(mask > 0, dal > 0)
@@ -474,11 +474,11 @@ def dilate(mask):
 def overlay(image, mask):
     image = image.copy()
     #img.setflags(write=1)
-    color0 = (255, 0, 0)[::-1]
-    color1 = (255, 94, 0)[::-1]
-    color2 = (103, 181, 85)[::-1]
-    color3 = (255, 255, 49)[::-1]
-    color4 = (255, 0, 252)[::-1]
+    color0 = (255, 0, 0)[::-1]  # red
+    color1 = (255, 94, 0)[::-1]  # orange
+    color2 = (103, 181, 85)[::-1] # green
+    color3 = (255, 255, 49)[::-1] # yellow
+    color4 = (255, 0, 252)[::-1] # purple
     #color5 = (145, 132, 80)[::-1]
     mask0 = dilate(mask[:, :, 0])
     mask1 = dilate(mask[:, :, 1])
@@ -497,20 +497,335 @@ def overlay(image, mask):
 
     return image
 
+def pad_patch(min_x, min_y, max_x, max_y, output_size):
+    width = max_x - min_x
+    height = max_y - min_y
+
+    if width < output_size:
+        w_diff_left = (output_size - width) // 2
+        w_diff_right = output_size - width - w_diff_left
+        min_x = max(0, min_x - w_diff_left)
+        max_x = max_x + w_diff_right
+    if height < output_size:
+        h_diff_top = (output_size - height) // 2
+        h_diff_bot = output_size - height - h_diff_top
+        min_y = max(0, min_y - h_diff_top)
+        max_y = max_y + h_diff_bot
+
+    return min_x, min_y, max_x, max_y
+
+#def mask_out(image, mask):
+def crop_out(image, mask):
+    for i in range(mask.shape[2]):
+        if i == 5:
+            continue
+
+        n_ids = np.unique(mask[:, :, i])
+        tmp_img = image.copy()
+        #tmp_mask = np.zeros((image.shape[:2]))
+        bg_mask = mask[:, :, 5] > 0
+        nuclei_mask = mask[:, :, i] > 0
+        #tmp_mask[bg_mask & nuclei_mask] = 1
+        #tmp_img[bg_mask & nuclei_mask] = 0
+        #tmp_img[bg_mask & nuclei_mask] = 0
+        tmp_img[~(bg_mask + nuclei_mask)] = 0
+        #cv2.imwrite('tmp2/tttt{}.jpg'.format(i), tmp_img)
+        if len(n_ids) > 0:
+        #print(n_ids)
+            for n_id in n_ids:
+                if n_id == 0:
+                    continue
+                #print(i)
+                row, col = (mask[:, :, i] == n_id).nonzero()
+                min_y = row.min()
+                max_y = row.max()
+                min_x = col.min()
+                max_x = col.max()
+                #print(r_min, r_max, c_min, c_max)
+                #r_min, c_max,
+                min_x, min_y, max_x, max_y = pad_patch(min_x, min_y, max_x, max_y, 64)
+                bbox = [min_x, min_y, max_x, max_y]
+                patch = tmp_img[min_y : max_y, min_x : max_x]
+                print(patch.shape)
+                cv2.imwrite(
+                    'tmp2/{}_{}.jpg'.format(i, n_id),
+                    patch
+                )
+
+                #if i == 0 and n_id == 25:
+                #    image = cv2.rectangle(image, tuple(bbox[:2]), tuple(bbox[2:]), color=(0, 0, 0), thickness=3)
+
+                #    #cv2.rectangle(image, )
+                #    cv2.imwrite('tmp2/{}.jpg'.format(500), image)
+
+
+                #if i == 2 and n_id == 69:
+                #    image = cv2.rectangle(image, tuple(bbox[:2]), tuple(bbox[2:]), color=(0, 0, 0), thickness=3)
+
+                #    #cv2.rectangle(image, )
+                #    cv2.imwrite('tmp2/{}.jpg'.format(500), image)
+
+
+
+#def crop_consep(image, mask):
+    #for i in mask['inst_type']:
+
 
 path = '/data/smb/syh/colon_dataset/PanukeEx/cancer-instance-segmentation-and-classification-2'
-dataset = PanNuke(path)
+#dataset = PanNuke(path)
 
-print(len(dataset))
+#print(len(dataset))
 
 count = 0
-for i in dataset:
-    count += 1
-    #i = dataset[144]
-    image, mask, type_id = i
-    #print(image.shape)
-    #print(mask.shape)
-    image = overlay(image, mask)
-    #print(type_id)
-    cv2.imwrite('pannuke_overlay/{}_{}.jpg'.format(type_id, count), image)
+#path = '/data/smb/syh/colon_dataset/Kumar/Kumar/train/'
+path = '/data/smb/syh/colon_dataset/Kumar/Kumar/train/'
+images = os.path.join(path, 'Images')
+labels = os.path.join(path, 'Labels')
+
+label = 'TCGA-G9-6348-01Z-00-DX1.mat'
+image = 'TCGA-G9-6348-01Z-00-DX1.tif'
+
+image_path = os.path.join(images, image)
+label_path = os.path.join(labels, label)
+#overlay = '/data/smb/syh/colon_dataset/Kumar/Kumar/train/Overlay/TCGA-G9-6348-01Z-00-DX1.png'
+overlay = '/data/smb/syh/colon_dataset/CoNSeP/Train/Overlay/train_23.png'
+label_path = '/data/smb/syh/colon_dataset/CoNSeP/Train/Labels/train_23.mat'
+print(image_path)
+print(label_path)
+print(overlay)
+
+#import scipy.io as sio
+#mat = sio.loadmat(label_path)
+#n_ids = np.unique(mat['inst_map'])
+#image = cv2.imread(overlay)
+#mask = mat['inst_map']
+## bg_mask = mask[:, :] == 0
+## nuclei_mask = mask[:, :] > 0
+##         #tmp_mask[bg_mask & nuclei_mask] = 1
+##         #tmp_img[bg_mask & nuclei_mask] = 0
+##         #tmp_img[bg_mask & nuclei_mask] = 0
+## tmp_img[~(bg_mask + nuclei_mask)] = 0
+#for n in n_ids:
+#    if n == 0:
+#        continue
+#
+#    row, col = (mask == n).nonzero()
+#    min_y = row.min()
+#    max_y = row.max()
+#    min_x = col.min()
+#    max_x = col.max()
+#                #print(r_min, r_max, c_min, c_max)
+#                #r_min, c_max,
+#    min_x, min_y, max_x, max_y = pad_patch(min_x, min_y, max_x, max_y, 64)
+#    bbox = [min_x, min_y, max_x, max_y]
+#    patch = image[min_y : max_y, min_x : max_x]
+#    #print(patch.shape)
+#    cv2.imwrite(
+#        'tmp3/{}.jpg'.format(n),
+#        patch
+#    )
+
+
+
+#for i in dataset:
+#    #print(i)
+#    i = dataset[1000]
+#    image, mask, type_id = i
+#    image = overlay(image, mask)
+#    cv2.imwrite('tmp2/{}.jpg'.format(1000), image)
+#    #crop_out(image, mask)
+#
+#    #mask_out(image, mask)
+#    #print(image.shape, mask.shape, type_id)
+#    #print(mask.shape)
+#    #print(mask[:, :, 0].max())
+#    #print(np.unique(mask))
+#    break
+#for i in dataset:
+#    count += 1
+#    #i = dataset[144]
+#    #print(image.shape)
+#    #print(mask.shape)
+#    #print(type_id)
+#    cv2.imwrite('pannuke_overlay/{}_{}.jpg'.format(type_id, count), image)
     #break
+
+def draw_mask(image, mask):
+    #tmp = image.copy()
+    tmp = cv2.resize(image, (0, 0), fx=2, fy=2)
+    tmp_mask = dilate(mask)
+    tmp[tmp_mask] = (0, 255, 0)
+    tmp = cv2.resize(tmp, (0, 0), fx=0.5, fy=0.5)
+
+    return tmp
+
+def crop_patches(image, mask):
+    image = cv2.resize(image, (0, 0), fx=2, fy=2)
+    for n_id in np.unique(mask):
+        if n_id == 0:
+            continue
+
+        row, col = (mask == n_id).nonzero()
+        min_y = row.min()
+        max_y = row.max()
+        min_x = col.min()
+        max_x = col.max()
+        #print(r_min, r_max, c_min, c_max)
+        #r_min, c_max,
+        min_x, min_y, max_x, max_y = pad_patch(min_x, min_y, max_x, max_y, 64)
+        bbox = [min_x, min_y, max_x, max_y]
+        patch = image[min_y : max_y, min_x : max_x]
+        #print(patch.shape)
+        cv2.imwrite(
+            'tmp2/{}.jpg'.format(n_id),
+            patch
+        )
+
+def draw_coords(image, coords):
+    #cv2.circle(image, tuple(coord[::-1]), 3, (0, 200, 0), cv2.FILLED, 1)
+    #image = cv2.resize(image, (0, 0), fx=2, fy=2)
+    for coord in coords:
+        image = cv2.circle(image, tuple(coord.long().tolist()[::-1]), 8, (50, 255, 255), cv2.FILLED, 1)
+
+    #image = cv2.resize(image, (0, 0), fx=0.5, fy=0.5)
+    return image
+
+def draw_edges(image, edges, coords):
+    #image = cv2.resize(image, (0, 0), fx=2, fy=2)
+    for i in  range(edges.shape[1]):
+        start = coords[edges[0, i]]
+        end = coords[edges[1, i]]
+        #start = start / 2
+        #end = end / 2
+        #print(start, end)
+        image = cv2.line(image, start.long().tolist()[::-1], end.long().tolist()[::-1], color=(0, 255, 0), thickness=3)
+
+    #image = cv2.resize(image, (0, 0), fx=0.5, fy=0.5)
+
+    return image
+
+def crop_patch(image, start, patch_size):
+    h, w = start
+    patch = image[h : h + patch_size, w : w + patch_size].copy()
+    image = cv2.rectangle(image, [w, h], [w + patch_size, h + patch_size], color=(0, 0, 255), thickness=6)
+    return image, patch
+
+def vis_graph(image, cg):
+    image = draw_edges(image, cg.edge_index, cg.pos)
+    image = draw_coords(image, cg.pos)
+    return image
+
+
+#def draw_cg_figure(image, cg, crop_coord, patch_size):
+#
+#    image = vis_graph(image, cg)
+#    h, w = crop_coord
+#    first_img, patch = crop_patch(image, (h, w), patch_size)
+
+
+image_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/raw/CRC/fold_1/1_normal/H10-24087_A2H_E_1_1_grade_1_2689_2913.png'
+mask_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/proto/mask/CRC/shaban-cia/fold_1/1_normal/H10-24087_A2H_E_1_1_grade_1_2689_2913.npy'
+pos_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/proto/coordinate/CRC/fold_1/1_normal/H10-24087_A2H_E_1_1_grade_1_2689_2913.npy'
+cg_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_avg_cia_knn/0/fold_1/H10-24087_A2H_E_1_1_grade_1_2689_2913.pt'
+
+import numpy as np
+import cv2
+mask = np.load(mask_path)
+image = cv2.imread(image_path)
+orig = image.copy()
+
+#print(image.shape)
+#print(mask.shape)
+
+overlay = draw_mask(image, mask)
+print(overlay.shape)
+first_img, patch = crop_patch(overlay, (1000, 300), 251)
+cv2.imwrite('aa.jpg', first_img)
+cv2.imwrite('ff.jpg', patch)
+#crop_patches(overlay, mask)
+
+mask = cv2.resize(mask, (0, 0), fx=0.5, fy=0.5)
+#mask = mask / mask.max() * 255
+mask[mask > 0] = 255
+
+#cv2.imwrite('aa1.jpg', mask)
+
+h, w = mask.shape[:2]
+#print(h, w)
+#patch =
+#print(mask.shape)
+patch = overlay[h // 2 : , w // 2 : ]
+image[:, :, 0] = mask
+image[:, :, 1] = mask
+image[:, :, 2] = mask
+#print(np.unique(patch))
+image[h // 2 :, w // 2 :] = patch
+cv2.imwrite('aa1.jpg', image)
+
+
+#pos = np.load(pos_path)
+cg = torch.load(cg_path)
+
+image = cv2.imread(image_path)
+#image = cv2.resize(image, (0, 0), fx=2, fy=2)
+#draw_edges = draw_edges(image, cg.edge_index, cg.pos)
+
+#draw_coords = draw_coords(image, cg.pos)
+
+#cv2.imwrite('hello1.jpg', first_img)
+#cv2.imwrite('hello_patch1.jpg', patch)
+
+
+# crc dataset
+#image_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/raw/CRC/fold_2/3_high_grade/H09-24359_A2H_E_1_6_grade_3_2689_3137_180.png'
+#graph_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/fix_avg_cia_knn/0/fold_2/H09-24359_A2H_E_1_6_grade_3_2689_3137_180.pt'
+#image_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Images/fold_3/3_high_grade/Grade3_Patient_172_9_grade_3_row_2688_col_4256.png'
+#image_path = 'ecrc.jpg'
+#graph_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Cell_Graph/1792_avg_64/proto/fix_avg_cia_knn/0/fold_3/Grade3_Patient_172_9_grade_3_row_2688_col_4256.pt'
+#image_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Images/train/is082.tif'
+#graph_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/hatnet512dim/is082_grade_3_aug_0.pt'
+image_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images/5Crops/ZT80_38_C_8_8_crop_4.jpg'
+graph_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops/ZT80_38_C_8_8_crop_4_grade_2.pt'
+
+image = cv2.imread(image_path)
+cg = torch.load(graph_path)
+image = vis_graph(image, cg)
+print(image.shape)
+
+#first_img, patch = crop_patch(image, (1000, 300), 256)
+first_img, patch = crop_patch(image, (530, 500), 256)
+
+
+#cv2.imwrite('crc_vis.jpg', first_img)
+#cv2.imwrite('crc_vis.jpg', first_img)
+print(first_img.shape, 1111)
+cv2.imwrite('uzh_vis.jpg', first_img)
+cv2.imwrite('uzh_vis_patch.jpg', patch)
+
+
+
+
+#path = 'compressed'
+#for i in os.listdir(os.path.join(os.getcwd(), path)):
+#    #print(i)
+#    image_path = os.path.join(os.getcwd(), path, i)
+#    image = cv2.imread(image_path)
+#
+#    cv2.imwrite('res/{}.jpg'.format(i.split('.')[0]), image)
+
+path = 'res'
+
+for i in os.listdir(path):
+    print(i)
+#image = cv2.imread(path)
+    image = cv2.imread(os.path.join('res', i))
+    if image.shape[0] < 1000:
+        image = cv2.resize(image, (256, 256))
+    else:
+        image = cv2.resize(image, (512, 512))
+
+
+    print(image.shape)
+    cv2.imwrite(os.path.join('res', i), image)
+
+#image = cv2.resize(image, (1024, 1024))

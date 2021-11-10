@@ -94,7 +94,10 @@ def extract_nuclei(root_path, save_path, patch_size, img_type, image_set):
             5 : 3,
             6 : 3,
             7 : 3
+    }
     for idx, i in enumerate(glob.iglob(os.path.join(CoNSep_PATH, image_set, 'Labels', '*.mat'))):
+        if '23' not in i:
+            continue
         label = io.loadmat(i)
         inst_centroid = label['inst_centroid']
         print(i)
@@ -229,6 +232,8 @@ image_type = ['Overlay', 'Images']
 image_set = ['train', 'test']
 CoNSep_PATH = '/data/smb/syh/colon_dataset/CoNSeP'
 #SAVE_PATH = '/data/by/tmp/HGIN/dataflow/consep_data'
-SAVE_PATH = '/data/by/tmp/HGIN/dataflow/consep_data/{}/{}'.format(image_set[0], image_type[0])
+#SAVE_PATH = '/data/by/tmp/HGIN/dataflow/consep_data/{}/{}'.format(image_set[0], image_type[0])
+SAVE_PATH = '/data/hdd1/by/HGIN/tmp3/{}/{}'.format(image_set[0], image_type[0])
 #extract_nuclei(CoNSep_PATH, SAVE_PATH, 64, 'Overlay')
+os.makedirs(SAVE_PATH, exist_ok=True)
 extract_nuclei(CoNSep_PATH, SAVE_PATH, 64, image_type[0], image_set[0])

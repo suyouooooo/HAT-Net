@@ -394,6 +394,7 @@ class TCGAProstateTestNormalize(Dataset):
         #self.mean = torch.tensor(mean)
         #self.std = torch.tensor(std)
         self.eps = 1e-7
+        #print(root, 'roooooooooooooot')
         self.mean = torch.tensor(np.load(os.path.join(root, 'mean.npy')))
         #self.mean = torch.tensor(np.load(
         #    '/data/hdd1/by/HGIN/acc872_prostate_5cropsAug/stats/mean.npy' # 87.2 withtypes

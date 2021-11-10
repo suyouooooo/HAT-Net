@@ -14,8 +14,8 @@ import json
 import time
 from common.utils import mkdirs, save_checkpoint, load_checkpoint, init_optim, output_to_gexf, Metric
 from torch.optim import lr_scheduler
-from model import network_GIN_Hierarchical
-from model.network_GIN_baiyu import HatNet
+from model import network_GIN_Hierarchical, network_CGCNet
+from model.network_GIN_baiyu import HatNet, HatNetC
 from torch_geometric.nn import DataParallel
 from dataflow.data import prepare_train_val_loader, get_ecrc_dataset, get_bach_dataset
 from setting import CrossValidSetting as DataSetting
@@ -103,6 +103,7 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
                 ypred, _, = model(data)
                 preds = torch.argmax(ypred, dim=-1)
 
+                # Normal, Benign, in situ and Invasive
                 for r in preds:
                     r = r.cpu().item()
                     if r == 0:
@@ -128,6 +129,7 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
     image_acc_bin = metric.image_acc_binary_class()
     kappa = metric.kappa()
     auc = metric.auc()
+    metric.sen_spe()
 
     result = {'patch_acc': patch_acc, 'img_acc':image_acc_three, 'binary_acc':  image_acc_bin, 'kappa': kappa, 'auc': auc}
     return result
@@ -164,12 +166,22 @@ def cell_graph(args, writer = None):
     #                                      depth=args.depth,
     #                                      stage=args.stage
     #                                      )
-    model = HatNet(512, 64, args.num_classes)
+    model = HatNetC(512, 64, args.num_classes, train_loader.dataset.num_nodes)
+    #model = network_CGCNet.SoftPoolingGcnEncoder(setting.max_num_nodes,
+    #                                          input_dim, args.hidden_dim, args.output_dim, True, True, args.hidden_dim,
+    #                                          args.num_classes,
+    #                                          args.assign_ratio, [50], concat=True,
+    #                                          gcn_name=args.gcn_name, collect_assign=args.visualization,
+    #                                          load_data_sparse=True,
+    #                                          norm_adj=args.norm_adj, activation=args.activation,
+    #                                          drop_out=args.drop_out,
+    #                                          jk=args.jump_knowledge
+    #                                          )
+    model = model.cuda()
 
     #for i in glob.
     model.load_state_dict(torch.load(args.weight_file)['state_dict'])
 
-    model = model.cuda()
     #if torch.cuda.device_count() > 1 :
     #    print('use %d GPUs for training!'% torch.cuda.device_count())
 

@@ -22,7 +22,6 @@ class NN(nn.Module):
 
     def forward(self, x):
         #print(x.shape, self.fc1)
-        #print(x.shape, self.fc1)
         x = self.fc1(x)
         if x.dim() == 3:
             x = x.permute(0, 2, 1)
@@ -491,7 +490,8 @@ class HatNet(nn.Module):
             #dim_feedforward=dim * 4)
             #dim_feedforward=2048)
             #dim_feedforward=dim)
-            dim_feedforward=dim)
+            #dim_feedforward=dim)
+        )
 
         self.pool1 = nn.Linear(dim, num_nodes)
         num_nodes = int(ratio * num_nodes)

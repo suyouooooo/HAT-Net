@@ -191,12 +191,16 @@ class BaseDataset:
         #if path not in self.imagefp2coords:
         #    r_idx, c_idx = self.imagefp2coords[os.path.basename(path)]
         #else:
+        #print(self.imagefp2coords.keys())
         r_idx, c_idx = self.imagefp2coords[path]
         base_name = os.path.basename(path)
+        #print(base_name)
         image_prefix = base_name.split('_grade_')[0]
         file_grid = self.file_grids[image_prefix]
         patch = file_grid[r_idx : r_idx+self.border, c_idx : c_idx+self.border]
+        #print(patch, self.stich_files)
         data = self.stich_files(patch)
+        #print(data)
         return data
 
     #abstrct
@@ -355,7 +359,6 @@ class ImageDataset(BaseDataset):
             image = cv2.resize(image, (0, 0), fx=0.3, fy=0.3)
 
 
-            print(base_name, idx)
             cv2.imwrite(os.path.join(save_folder, base_name), image)
 
 class LMDBDataset(BaseDataset):
@@ -690,3 +693,12 @@ def draw_nuclei(image, json_label):
 ##    cv2.imwrite('fff.jpg', image)
 ##    break
 #
+
+
+#image_folder = ImageFolder('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Images/')
+#dataset = ImageDataset(image_folder, 1792)
+#
+##print(len(dataset))
+#image = dataset.get_file_by_path('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Images/fold_3/3_high_grade/Grade3_Patient_172_9_grade_3_row_2688_col_4256.png')
+#print(image.shape)
+#cv2.imwrite('ecrc.jpg', image)

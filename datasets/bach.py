@@ -95,36 +95,17 @@ class BACH(Dataset):
         std = self.std
 
         # normalize to range (0, 1)
-        #xmax = x.max()
-        #xmin = x.min()
         # avoid 0 division
         x = x / diff
-        #print(xmax, xmin, x.max(), x.min(), '33333333333333333333333', diff.max(), diff.min(), )
-        #print(mean.max(), mean.min())
-        #meanmin = mean.min()
-        #meanmax = mean.max()
         # avoid 0 division
         mean = mean / diff
-        #print(mean.max(), mean.min(), meanmin, meanmax)
+
         # avoid 0 division
         std = std / diff
-        #print(std.max(), std.min(), 'fffffffffffffffffff')
-        #print(mean.max(), mean.min(), std.max(), std.min())
 
-        #print(std.max(), std.min(), 111111111)
 
         # normalize to 0 mean, 1 std
-        #tmp = x - mean
-        #print(tmp.min(), tmp.max(), 'ccccccccccccccc')
-        #tmp[tmp < self.eps] = 0
-        #x = tmp / (std + self.eps)
-        #x = x - mean
         x = (x - mean) / (std + self.eps) # avoid 0 division
-        #print(x.min(), x.max())
-        #print((std < self.eps).sum(), id(std), '11')
-        #print((x > 10).sum(), id(std))
-        #print(x - mean)
-        #print(x.max(), x.min())
 
         return x
 

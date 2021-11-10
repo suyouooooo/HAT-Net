@@ -17,7 +17,7 @@ from skimage.filters.rank import entropy as Entropy
 from skimage.morphology import disk
 from common.nuc_feature import nuc_stats_new,nuc_glcm_stats_new
 import sys
-from dataflow.graph_transform import avg_pooling, random_sample
+from dataflow.graph_transform import avg_pooling, random_sample, dropnodes
 #sys.setrecursionlimit(1000)
 
 
@@ -372,8 +372,8 @@ def main():
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Feat/test/cgc16dim'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat/5Crops_Aug_CGC16dim'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/VGGUet_438dim'
-    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/PanNukeEx6Classes'
-    save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/feature/CRC/'
+    save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/PanNukeEx6Classes'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/feature/CRC/'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/CPC_1036'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Feat_Aug/cgc16dim/'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Feat/test/hatnet2048dim'
@@ -469,18 +469,24 @@ def main():
     #cell_graph_save_path = 'fix_avg_cia_knn_512x512'
     #cell_graph_save_path = 'fix_avg_cia_knn_1024x1024'
     #cell_graph_save_path = 'fix_avg_cia_knn_1792x1792'
-    cell_graph_save_path = 'fix_random_knn_1'
+    #cell_graph_save_path = 'fix_random_knn_1'
+    #cell_graph_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/drop50percentnodes_avg'
+    cell_graph_save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Cell_Graph/drop30percentnodes_PanNukeEx6classes/'
     # transforms
     print(cell_graph_save_path)
     #transforms = [partial(avg_pooling, size=64 * 2 * 2 * 2 * 2)]
     #transforms = [partial(avg_pooling, size=1792 * 2)]
-    transforms = [partial(random_sample, sampled_nodes=1)]
+    #transforms = [partial(random_sample, sampled_nodes=1)]
+    transforms = [
+        partial(dropnodes, ratio=0.3),
+        partial(avg_pooling, size=64)
+    ]
 
 
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/PanNukeEx6Classes/0'
 
-    #dataset = CellGraphPt(save_path, transforms=transforms)
-    dataset = CellGraphNpy(save_path, transforms=transforms)
+    dataset = CellGraphPt(save_path, transforms=transforms)
+    #dataset = CellGraphNpy(save_path, transforms=transforms)
     writer = CellGraphWriter(cell_graph_save_path)
     cell_graph_pipline(dataset, writer)
 

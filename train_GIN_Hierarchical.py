@@ -64,6 +64,7 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
     image_acc_bin = metric.image_acc_binary_class()
     kappa = metric.kappa()
     auc = metric.auc()
+    metric.sen_spe()
 
     result = {'patch_acc': patch_acc, 'img_acc':image_acc_three, 'binary_acc':  image_acc_bin, 'kappa': kappa, 'auc': auc}
     return result
@@ -320,8 +321,8 @@ def cell_graph(args, writer = None):
         #model = Prostate(1036, 64, args.num_classes)
 
         #model = HatNet(input_dim, 64, args.num_classes, num_nodes=num_nodes)
-        #model = HatNet(input_dim, args.hidden_dim, args.num_classes, num_nodes=num_nodes)
-        model = HatNetC(input_dim, args.hidden_dim, args.num_classes, num_nodes=num_nodes)
+        model = HatNet(input_dim, args.hidden_dim, args.num_classes, num_nodes=num_nodes)
+        #model = HatNetC(input_dim, args.hidden_dim, args.num_classes, num_nodes=num_nodes)
         #model = network_GIN_Hierarchical.SoftPoolingGcnEncoder(setting.max_num_nodes,
         #    input_dim, args.hidden_dim, args.output_dim, True, True, args.hidden_dim,  args.num_classes,
         #                                      args.assign_ratio,[50], concat= True,
@@ -349,8 +350,12 @@ def cell_graph(args, writer = None):
                                               jk=args.jump_knowledge
                                               )
 
-    print(model)
+    elif args.network == 'CON':
+        model = HatNetC(input_dim, args.hidden_dim, args.num_classes, num_nodes=num_nodes)
+
     #model.load_state_dict(torch.load('output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_namefuse_adj0.4_BACH_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs1000_lr0.001_networkHGTIN_gamma0.1/Monday_27_September_2021_18h_30m_12s/model_best.pth.tar')['state_dict'], strict=False)
+    #model.load_state_dict(torch.load('output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_namefuse_adj0.4_BACH_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs1000_lr0.001_networkCGC_gamma0.1/Sunday_26_September_2021_19h_42m_23s/model_best.pth.tar')['state_dict'])
+    print(model)
     #model.load_state_dict(torch.load('output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_nameavg_adj0.4_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs1000_lr0.001_networkHGTIN_gamma0.1/Tuesday_05_October_2021_14h_14m_37s/model_best.pth.tar')['state_dict'], strict=False)
     #if args.cross_val == 1:
     #    model_path = '/home/baiyu/HGIN/output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_nameavg_adj0.4_ECRC_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs35_lr0.001_networkHGTIN_gamma0.1/Wednesday_28_July_2021_20h_49m_55s/model_best.pth.tar'
@@ -546,6 +551,7 @@ def main():
         writer = SummaryWriter(log_dir=tb_logdir)
     #if os.path.exists()
     #tb_logdir = os.path.join()
+    #kkkk
     cell_graph(prog_args, writer=writer)
 
 if __name__ == "__main__":

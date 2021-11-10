@@ -264,6 +264,7 @@ class SoftPoolingGcnEncoder(nn.Module):
         if self.norm_adj:
             adj = self._re_norm_adj(adj, 0.4, embedding_mask)
         # GCN_embed_1是Adaptive GraphSage
+        #print(self.GCN_embed_1, x.shape)
         embed_feature = self.GCN_embed_1(x, adj, embedding_mask)
         if self.jk:
             embed_feature = self.jk1(embed_feature)

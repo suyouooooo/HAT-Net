@@ -276,10 +276,10 @@ def get_bach_dataset(args):
     #test_dataset = BACH('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/test/hatnet128dim/')
     #train_dataset = BACH('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/hatnet32dim/')
     #test_dataset = BACH('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/test/hatnet32dim/')
-    #train_dataset = BACH('trainbach512/hatnet512dim/')
-    #test_dataset = BACH('testbach512/hatnet512dim/')
-    train_dataset = BACH('trainbach512/hatnet512dim_backup/')
-    test_dataset = BACH('testbach512/hatnet512dim_backup/')
+    train_dataset = BACH('trainbach512/hatnet512dim/')
+    test_dataset = BACH('testbach512/hatnet512dim/')
+    #train_dataset = BACH('trainbach512/hatnet512dim_backup/')
+    #test_dataset = BACH('testbach512/hatnet512dim_backup/')
     #train_dataset = BACH('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/Aug/cgc16dim/')
     #test_dataset = BACH('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Cell_Graph/test/cgc16dim/')
 
@@ -460,7 +460,7 @@ def get_tgca_dataset(args):
 
 
 
-    def split_train_test(image_file_path, args):
+    def split_train_test_balance(image_file_path, args):
          cv = args.cross_val
          assert 1 <= cv <= 5
          #cv = 1
@@ -488,9 +488,10 @@ def get_tgca_dataset(args):
 
          train_set = grade1_prefix[:grade1_num * (cv - 1)]
          train_set.extend(grade1_prefix[grade1_num * cv:])
-         test_set = grade1_prefix[grade1_num * (cv - 1) :  grade1_num * cv]
+         test_set = grade1_prefix[grade1_num * (cv - 1) : grade1_num * cv]
 
 
+         print(len(grade2_prefix), len(grade1_prefix), len(grade2_prefix) + len(grade1_prefix))
          train_set.extend(grade2_prefix[:grade2_num * (cv - 1)])
          train_set.extend(grade2_prefix[grade2_num * cv:])
          test_set.extend(grade2_prefix[grade2_num * (cv - 1) : grade2_num * cv])
@@ -574,10 +575,14 @@ def get_tgca_dataset(args):
          #fold_num = 432
          #cv = args.cross_val
          ##cv = 1
+         print(len(prefixes))
+         print(len(clusters))
+         print(len(train_indices), len(test_indices))
 
          #train_indices.extend(test_indices[:fold_num * (cv - 1)])
          #train_indices.extend(test_indices[fold_num * cv:])
          #test_indices = test_indices[fold_num * (cv - 1) : fold_num * cv]
+         #import sys; sys.exit()
 
          return train_indices, test_indices
 
@@ -594,7 +599,9 @@ def get_tgca_dataset(args):
     #dataset = TCGAProstateTestNormalize('/data/hdd1/by/HGIN/acc872_prostate_5cropsAug')
     #dataset = TCGAProstateTestNormalize('/data/hdd1/by/HGIN/acc872_prostate_5cropsAug_fix_label/')
     #dataset = TCGAProstateTestNormalize('/data/hdd1/by/HGIN/acc872_prostate_5cropsAug_fix_label/')
-    dataset = TCGAProstateTestNormalize('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_CGC16dim/')
+    #dataset = TCGAProstateTestNormalize('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops_Aug_CGC16dim/')
+    print(args.path, 111)
+    dataset = TCGAProstateTestNormalize(args.path)
     #dataset = TCGAProstate('ttt_del1/')
 
 
@@ -603,7 +610,8 @@ def get_tgca_dataset(args):
     image_file_path = dataset.filepath()
     #train_indices, test_indices = split_train_test(image_file_path, args) # class balanced
     #train_indices, test_indices = split_train_test_five_folds(image_file_path, args)
-    train_indices, test_indices = split_train_test_random(image_file_path, args)
+    #train_indices, test_indices = split_train_test_random(image_file_path, args)
+    train_indices, test_indices = split_train_test_balance(image_file_path, args)
     test_sampler = SubsetRandomSampler(test_indices)
     train_sampler = SubsetRandomSampler(train_indices)
     train_set = DataLoader(dataset, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False, sampler=train_sampler, pin_memory=True)

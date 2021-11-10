@@ -380,13 +380,17 @@ class SoftPoolingGcnEncoder(nn.Module):
             embed_feature = self.jk1(embed_feature)
         # out, _ = torch.max(embed_feature, dim = 1)
         # out_all.append(out)
+        print(x.shape, embedding_mask.shape)
         assign = self.GCN_pool_1(x, adj, embedding_mask)
+        print(assign.shape, 'assign', embed_feature.shape, 'embedding')
+        print('fffffff')
 
         if self.pool_tec == 'mincut':
             x, adj,mincut_loss, ortho_loss, num_nodes = self.dense_mincut_pool(embed_feature, adj, assign, embedding_mask)
         elif self.pool_tec == 'diff':
             x, adj = self._diff_pool(embed_feature, adj, assign, embedding_mask)
 
+        print(x.shape)
         out, _ = torch.max(x, dim=1)
         out_all.append(out)
 

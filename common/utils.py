@@ -11,6 +11,7 @@ from torch.nn import Parameter
 import matplotlib.pyplot as plt
 from sklearn.metrics import cohen_kappa_score
 from sklearn import metrics
+from sklearn.metrics import confusion_matrix
 
 
 
@@ -319,6 +320,50 @@ class Metric:
         self.total_images = [0] * num_classes # grade 1 grade 2 grade 3
         self.correct_images = [0] * num_classes
 
+    def _binary_cls(self, cls_id, data_list):
+        output = []
+        for i in data_list:
+            if cls_id == i:
+                output.append(1)
+            else:
+                output.append(0)
+        return output
+    def _compute_sen_sep(self, preds, labels):
+        tn, fp, fn, tp = confusion_matrix(preds, labels).ravel()
+        sen = tp / (tp + fn)
+        sep = tn / (tn + fp)
+        return sen, sep
+
+    def sen_spe(self):
+        print('image_sensitivity_specificity....')
+        gts = []
+        preds = []
+        for key, value in self.image_prefix.items():
+            pred = value.index(max(value))
+            label = self.image_label[key]
+            gts.append(label)
+            preds.append(pred)
+
+        for cls_id in range(max(gts) + 1):
+            sen, sep = self._compute_sen_sep(
+                self._binary_cls(cls_id, preds),
+                self._binary_cls(cls_id, gts),
+            )
+            print('class {}, sensitivity: {:02f}, specificity: {:02f}'.format(
+                cls_id, sen, sep
+            ))
+
+
+
+
+
+
+
+            #correct += pred == label
+            #total += 1
+            #if pred != label:
+                #print(key, value, label)
+
 
     def update(self, preds, labels, pathes):
 
@@ -386,7 +431,7 @@ class Metric:
             correct += pred == label
             total += 1
             if pred != label:
-                print(key, value)
+                print(key, value, label)
 
             #if label == 0:
             #    if pred == label:

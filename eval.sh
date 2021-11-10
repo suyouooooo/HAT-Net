@@ -1,6 +1,6 @@
 #!/bin/bash
 #export CUDA_VISIBLE_DEVICES=1 && python train_HGP_GCN.py --batch_size 10
-export CUDA_VISIBLE_DEVICES=3
+export CUDA_VISIBLE_DEVICES=2
 #export CUDA_HOME=$CUDA_HOME:/home/syh/cuda-11.0
 #export PATH=$PATH:/home/syh/cuda-11.0/bin
 #export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/syh/cuda-11.0/lib64
@@ -56,7 +56,10 @@ export CUDA_VISIBLE_DEVICES=3
 
 #python -u eval.py  --norm_adj --batch-size=30 --step_size=10 --jk  --depth 6  --stage  2 3 --cv 3 --name avg --weight_file output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_namefull_adj0.4_TCGA_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs200_lr0.001_networkHGTIN_gamma0.1/Thursday_19_August_2021_23h_16m_25s/model_best.pth.tar --task TCGA
 #python -u eval.py  --norm_adj --batch-size=30 --step_size=10 --jk  --depth 6  --stage  2 3 --cv 3 --name avg --weight_file output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_namefull_adj0.4_TCGA_sr1_d0.2_jkknn_cv5_stage23_depth6_epochs200_lr0.001_networkHGTIN_gamma0.1/Friday_20_August_2021_09h_51m_22s/model_best.pth.tar --task TCGA
-python -u eval.py  --norm_adj --batch-size=30 --step_size=10 --jk  --depth 6  --stage  2 3 --cv 3 --name avg --weight_file  output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_namefuse_adj0.4_BACH_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs1000_lr0.001_networkHGTIN_gamma0.1/Thursday_23_September_2021_22h_45m_34s/model_best.pth.tar  --task BACH
+#python -u eval.py  --norm_adj --batch-size=30 --step_size=10 --jk  --depth 6  --stage  2 3 --cv 3 --name avg --weight_file  output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_namefuse_adj0.4_BACH_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs1000_lr0.001_networkHGTIN_gamma0.1/Thursday_23_September_2021_22h_45m_34s/model_best.pth.tar  --task BACH
+#python -u eval.py  --norm_adj --batch-size=30 --step_size=10 --jk  --depth 6  --stage  2 3 --cv 3 --name avg --weight_file  output/result/nuclei_soft-assign_l3x1_ar10_h64_o20_fca_%1_namefuse_adj0.4_BACH_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs1000_lr0.001_networkHGTIN_gamma0.1/Sunday_03_October_2021_02h_32m_33s/model_best.pth.tar  --task BACH
+#python -u eval.py  --norm_adj --batch-size=30 --step_size=10 --jk  --depth 6  --stage  2 3 --cv 3 --name avg --weight_file  output/result/nuclei_soft-assign_l3x1_ar10_h20_o20_fca_%1_namefuse_adj0.4_BACH_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs1000_lr0.001_networkCGC_gamma0.1/Sunday_26_September_2021_19h_42m_23s/model_best.pth.tar  --task BACH 
+python -u eval.py  --norm_adj --batch-size=30 --step_size=10 --jk  --depth 6  --stage  2 3 --cv 3 --name avg --weight_file  output/result/nuclei_soft-assign_l3x1_ar10_h64_o20_fca_%1_namefuse_adj0.4_BACH_sr1_d0.2_jkknn_cv1_stage23_depth6_epochs1000_lr0.001_networkCON_gamma0.1/Thursday_28_October_2021_00h_04m_55s/model_best.pth.tar  --task BACH 
 
 
 #python -u train_GIN_Hierarchical.py  --norm_adj --batch-size=20 --step_size=10 --jk  --depth 1  --stage  2 3 --cv 2  --num_eval 5

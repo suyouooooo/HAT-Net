@@ -31,3 +31,14 @@ def random_sample(data, sampled_nodes):
     #import sys; sys.exit()
 
     return data
+
+def dropnodes(data, ratio):
+    length = len(data.x)
+    sample = torch.rand(length).topk(int(length * (1 - ratio))).indices
+    mask = torch.zeros(length, dtype=torch.bool)
+    mask.scatter_(dim=0, index=sample, value=True)
+
+    data.x = data.x[mask]
+    data.pos = data.pos[mask]
+
+    return data
