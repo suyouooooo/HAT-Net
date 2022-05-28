@@ -787,20 +787,20 @@ image = cv2.imread(image_path)
 image_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images/5Crops/ZT80_38_C_8_8_crop_4.jpg'
 graph_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Cell_Graph/5Crops/ZT80_38_C_8_8_crop_4_grade_2.pt'
 
-image = cv2.imread(image_path)
-cg = torch.load(graph_path)
-image = vis_graph(image, cg)
-print(image.shape)
-
-#first_img, patch = crop_patch(image, (1000, 300), 256)
-first_img, patch = crop_patch(image, (530, 500), 256)
-
-
-#cv2.imwrite('crc_vis.jpg', first_img)
-#cv2.imwrite('crc_vis.jpg', first_img)
-print(first_img.shape, 1111)
-cv2.imwrite('uzh_vis.jpg', first_img)
-cv2.imwrite('uzh_vis_patch.jpg', patch)
+#image = cv2.imread(image_path)
+#cg = torch.load(graph_path)
+#image = vis_graph(image, cg)
+#print(image.shape)
+#
+##first_img, patch = crop_patch(image, (1000, 300), 256)
+#first_img, patch = crop_patch(image, (530, 500), 256)
+#
+#
+##cv2.imwrite('crc_vis.jpg', first_img)
+##cv2.imwrite('crc_vis.jpg', first_img)
+#print(first_img.shape, 1111)
+#cv2.imwrite('uzh_vis.jpg', first_img)
+#cv2.imwrite('uzh_vis_patch.jpg', patch)
 
 
 
@@ -813,19 +813,26 @@ cv2.imwrite('uzh_vis_patch.jpg', patch)
 #
 #    cv2.imwrite('res/{}.jpg'.format(i.split('.')[0]), image)
 
-path = 'res'
-
-for i in os.listdir(path):
-    print(i)
-#image = cv2.imread(path)
-    image = cv2.imread(os.path.join('res', i))
-    if image.shape[0] < 1000:
-        image = cv2.resize(image, (256, 256))
-    else:
-        image = cv2.resize(image, (512, 512))
-
-
-    print(image.shape)
-    cv2.imwrite(os.path.join('res', i), image)
+#path = 'res'
+#
+#for i in os.listdir(path):
+#    print(i)
+##image = cv2.imread(path)
+#    image = cv2.imread(os.path.join('res', i))
+#    if image.shape[0] < 1000:
+#        image = cv2.resize(image, (256, 256))
+#    else:
+#        image = cv2.resize(image, (512, 512))
+#
+#
+#    print(image.shape)
+#    cv2.imwrite(os.path.join('res', i), image)
 
 #image = cv2.resize(image, (1024, 1024))
+
+
+import cv2
+import numpy as np
+
+mask = np.load('/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/proto/mask/CRC/shaban-cia/fold_1/1_normal/H10-24087_A2H_E_1_1_grade_1_2689_3585.npy')
+print(mask.shap)
