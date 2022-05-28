@@ -192,6 +192,7 @@ class BaseDataset:
         #    r_idx, c_idx = self.imagefp2coords[os.path.basename(path)]
         #else:
         #print(self.imagefp2coords.keys())
+        # print(self.imagefp2coords.keys()[3])
         r_idx, c_idx = self.imagefp2coords[path]
         base_name = os.path.basename(path)
         #print(base_name)
@@ -510,8 +511,15 @@ def draw_nuclei(image, json_label):
     for node in json_label:
         #print(11, node)
         cen = node['centroid']
-        cen = [int(c) for c in cen]
         image = cv2.circle(image, tuple(cen), 3, (0, 200, 0), cv2.FILLED, 1)
+        # print(node['centroid'], node['bbox'])
+
+        # cnt = [cnt // 2 for cnt in ]
+        # node['contour'] = [[c1 // 2, c2 // 2] for [c1, c2] in contour]
+        # cnt = [[c1 // 2, c2 // 2] for [c1, c2] in node['contour']]
+
+        # image = cv2.drawContours(image, [np.array(cnt)], -1, 255, -1)
+
 
     return image
 
@@ -557,8 +565,13 @@ def draw_nuclei(image, json_label):
 #sys.exit()
 #
 ##json_folder = JsonFolder('/data/by/tmp/hover_net/samples/out/fold')
-#json_folder = JsonFolder('/data/smb/syh/PycharmProjects/CGC-Net/data_su/raw/Extended_CRC/mask/fold_1/1_normal')
-#json_dataset = JsonDataset(json_folder, 1792)
+# json_folder = JsonFolder('/data/smb/syh/PycharmProjects/CGC-Net/data_su/raw/Extended_CRC/mask/fold_1/1_normal')
+# print('ffffff')
+# json_folder = JsonFolder('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Json/EXtended_CRC_Mask')
+# print('fffffffffff')
+# json_dataset = JsonDataset(json_folder, 1792)
+# json_path, label = json_dataset[33]
+# print(len(label), json_path)
 #
 #print(len(json_dataset))
 #print(len(image_dataset))
@@ -635,12 +648,26 @@ def draw_nuclei(image, json_label):
 ##data = dataset[33][1]
 ##path = dataset[33][0]
 #print(path)
-#image_folder = ImageFolder('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Images')
-#img_dataset = ImageDataset(image_folder, 224 * 8)
+# image_folder = ImageFolder('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Images')
+# img_dataset = ImageDataset(image_folder, 224 * 8)
+# res = img_dataset[33]
+# img_dataset.get_file_by_path()
+# image_path = os.path.basename(json_path).replace('.json', '.png')
+# image = img_dataset.get_file_by_path(os.path.join('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Json/EXtended_CRC_Mask', image_path))
+
+
+# print(res[1].shape, res[0])
+
+# image = res[1]
+# image = cv2.resize(image, (0, 0), fx=2, fy=2)
+# image = draw_nuclei(image, label)
+# image = cv2.resize(image, (0, 0), fx=0.5, fy=0.5)
+# cv2.imwrite('aa.jpg', image)
 #image_path = path.replace('Feat_hand_crafted', 'Images').replace('.pt', '.png').replace('0/', '')
 ##print(path)
 ##print(image_path)
 #
+# print(len(img_dataset), len(json_dataset))
 ##image = img_dataset[33][1]
 #image = img_dataset.get_file_by_path(image_path)
 #image = cv2.resize(image, (0, 0), fx=2, fy=2)
@@ -702,3 +729,25 @@ def draw_nuclei(image, json_label):
 #image = dataset.get_file_by_path('/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Images/fold_3/3_high_grade/Grade3_Patient_172_9_grade_3_row_2688_col_4256.png')
 #print(image.shape)
 #cv2.imwrite('ecrc.jpg', image)
+
+
+
+
+if __name__ == '__main__':
+    image_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Images'
+    json_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Json/EXtended_CRC_Mask'
+
+    image_folder = ImageFolder(image_path)
+    image_dataset = ImageDataset(image_folder, 224 * 8)
+    image_path, image = image_dataset[44]
+
+
+    json_folder = JsonFolder(json_path)
+    json_dataset = JsonDataset(json_folder, 224 * 8)
+    json_fp = os.path.join(json_path, os.path.basename(image_path).replace('.png', '.json'))
+    json_label = json_dataset.get_file_by_path(json_fp)
+
+    # image = cv2.resize(image, (0, 0), fx=2, fy=2)
+    image = draw_nuclei(image, json_label)
+    # image = cv2.resize(image, (0, 0), fx=0.5, fy=0.5)
+    cv2.imwrite('aa.jpg', image)
