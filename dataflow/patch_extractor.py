@@ -1,4 +1,5 @@
 import math
+import random
 from skimage.feature import greycomatrix, greycoprops
 
 
@@ -73,7 +74,6 @@ class DeepPatches(ImagePatches):
 
     def __getitem__(self, idx):
         bbox = self.bboxes[idx]
-        #print(bbox, idx)
         bbox = self.pad_patch(*bbox, self.patch_size)
         patch = self.image[bbox[0]: bbox[2]+1, bbox[1]:bbox[3]+1]
         patch = self.transforms(patch)
@@ -584,8 +584,10 @@ class CPCPatches(ImagePatches):
 
         #self.mask[self.mask > 0] = 1
         self.mask = np.squeeze(self.mask)
+
         self.mask = remove_small_objects(self.mask > 1, min_size=10, connectivity=1, in_place=True)
         self.mask = label(self.mask)
+        print(self.mask.shape)
         #print(np.unique(self.mask))
         #import  sys; sys.exit()
         #self.int_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
@@ -595,6 +597,7 @@ class CPCPatches(ImagePatches):
             #print(np.unique(self.mask))
         #print(rel_path)
         self.props = regionprops(self.mask)
+        print(len(self.props), self)
         #print(len(self.props))
         #self.binary_mask = self.mask.copy()
         #self.binary_mask[self.binary_mask>0]= 1

@@ -43,9 +43,11 @@ from skimage.measure import regionprops
 
 from stich import JsonFolder, JsonDataset, ImageFolder, ImageDataset
 from patch_extractor import DeepPatches, CGCPatches, VGG16Patches, CPCPatches
-from raw_data_reader import RawDataReaderProsate5CropsAug, RawDataReaderBACH, RawDataReaderBACHTestSet, RawDataReaderCRC
+from raw_data_reader import RawDataReaderProsate5CropsAug, RawDataReaderBACH, RawDataReaderBACHTestSet, RawDataReaderCRC, RawDataReaderExCRC
 from deep_extractor import ExtractorResNet50, ExtractorVGG, ExtractorCPC
 from cell_graph_dataset import CellGraphPt, CellGraphNpy
+
+# import sys; sys.exit()
 
 
 def vis(img_fp, json_fp):
@@ -239,12 +241,12 @@ def generate_features_batch(data_loader, num_feats, rel_pathes, writer, deep_ext
 def feat_pipline(patch_dataset, deep_extractor, save_path, num_epoches, data_writer):
     ####
     # read raw images frodata_loaderm disk
-    print(len(patch_dataset))
+    # print(len(patch_dataset))
     #batch_size = 128  # batch size for raw images
     #batch_size = 16  # batch size for raw images
     batch_size = 4  # batch size for raw images
-    patch_dataset_loader = torch.utils.data.DataLoader(patch_dataset, batch_size=batch_size, num_workers=2, collate_fn=lambda x : x)
-    print(patch_dataset_loader)
+    patch_dataset_loader = torch.utils.data.DataLoader(patch_dataset, batch_size=batch_size, num_workers=2, collate_fn=lambda x : x, shuffle=False)
+    # print(patch_dataset_loader)
 
     start = time.time()
     for idx, pds in enumerate(patch_dataset_loader):
@@ -258,10 +260,16 @@ def feat_pipline(patch_dataset, deep_extractor, save_path, num_epoches, data_wri
         for pd in pds:
             num_feats.append(len(pd))
             rel_pathes.append(pd.rel_path)
+            print(pd.rel_path)
 
         # generate patches
-        print('generating patches')
+        # print(pds[0])
         pds = torch.utils.data.ConcatDataset(pds)
+        print(idx, len(patch_dataset_loader), 'generating patches, patch len: {}'.format(len(pds)))
+        if len(pds) == 0:
+            print('no patches are found! skipping this..')
+            continue
+
         pd_loader = DataLoader(pds, num_workers=4, batch_size=128 * 8 * 1, shuffle=False)  # batch size for nuclei patches
         #pd_loader = DataLoader(pds, num_workers=4, batch_size=1, shuffle=False)  # batch size for nuclei patches
         #print('dataset size:', len(patch_dataset), sum(num_feats))
@@ -276,6 +284,8 @@ def feat_pipline(patch_dataset, deep_extractor, save_path, num_epoches, data_wri
 
         finish = time.time()
         print('[{}/{}], speed:{:2f}'.format(idx * batch_size + batch_size, len(patch_dataset), (idx * batch_size + batch_size) / (finish - start)))
+        print('-----------------------------------------------------')
+        print()
 
 #def write_data(save_path, data):
 #    #print(save_path)
@@ -356,8 +366,12 @@ def main():
     #image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Images/5Crops_Aug/'
     #json_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Json/5Crops_json_withtypes_Aug/'
 
-    image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/raw/CRC'
-    json_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/proto/mask/CRC/shaban-cia'
+    #image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/raw/CRC'
+    #json_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/proto/mask/CRC/shaban-cia'
+    # image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/raw/CRC'
+    # json_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_yanning/proto/mask/CRC/shaban-cia'
+    image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Images'
+    json_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Json/EXtended_CRC_Mask'
     #image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Images_Aug'
     #json_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Json_Aug_withtypes'
     #image_folder = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Images/test'
@@ -372,11 +386,12 @@ def main():
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Feat/test/cgc16dim'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/TCGA_Prostate/Feat/5Crops_Aug_CGC16dim'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/VGGUet_438dim'
-    save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/PanNukeEx6Classes'
+    #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/PanNukeEx6Classes'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_res50/proto/feature/CRC/'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/CRC/Feat/CPC_1036'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Feat_Aug/cgc16dim/'
     #save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/Feat/test/hatnet2048dim'
+    save_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/ExCRC/Feat/ExCRC_CPC'
 
     #patch_size, mean, std, hf_transform
 
@@ -403,9 +418,10 @@ def main():
     ####################################################
     # read raw images and labels
     #raw_data_reader = RawDataReaderProsate5CropsAug
-    raw_data_reader = RawDataReaderCRC
+    # raw_data_reader = RawDataReaderCRC
     #raw_data_reader = RawDataReaderBACH
     #raw_data_reader = partial(RawDataReaderBACHTestSet, csv_file='/data/smb/syh/PycharmProjects/CGC-Net/data_baiyu/BACH/pred.csv')
+    raw_data_reader = RawDataReaderExCRC
     #############################################
 
 
@@ -427,12 +443,12 @@ def main():
     num_classes = 6 # pannuke extended
     #num_classes = 5 # vggunet monsac datset
     #output_dim = None
-    #output_dim = 16
-    output_dim = None
+    output_dim = 16
+    # output_dim = None
     #deep_extractor = ExtractorResNet50(weight_file, num_classes, output_dim)
     #deep_extractor = None
     #deep_extractor = ExtractorVGG(weight_file, num_classes, output_dim)
-    #deep_extractor = ExtractorCPC(weight_file, num_classes, output_dim)
+    deep_extractor = ExtractorCPC(weight_file, num_classes, output_dim)
     ###############################
 
 
@@ -442,12 +458,13 @@ def main():
 
     print('---------------------------')
     patch_size = 64
-    #patch_size = 71 vggunet
-    #patch_dataset = partial(patch_extractor, patch_size=patch_size, mean=mean, std=std)
+    # patch_size = 71 vggunet
+    patch_dataset = partial(patch_extractor, patch_size=patch_size, mean=mean, std=std)
     ##raw_data_reader = raw_data_reader(image_folder, json_folder, patch_dataset, return_mask=False)
-    #raw_data_reader = raw_data_reader(image_folder, json_folder, patch_dataset, return_mask=True)
+    raw_data_reader = raw_data_reader(image_folder, json_folder, patch_dataset, return_mask=True)
 
-    #feat_pipline(raw_data_reader, deep_extractor, save_path, 1, writer)
+    feat_pipline(raw_data_reader, deep_extractor, save_path, 1, writer)
+    import sys; sys.exit()
 
     #######################################s######################################################
     #######################################s######################################################
@@ -495,9 +512,12 @@ def main():
     ########################
 
 
+print(__name__)
 
 if __name__ == '__main__':
+    print('fffff')
     main()
 
 
-    import sys; sys.exit()
+    # import sys; sys.exit()
+

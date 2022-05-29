@@ -42,7 +42,7 @@ def network(network_name, num_classes, pretrained):
 
 class ExtractorResNet50ImageNet:
     def __init__(self, num_classes, output_dim=None):
-        self.net = network('resnet50',  5, True)
+        self.net = network('resnet50', 1000, True)
         self.net = self.net.cuda()
         print(torch.cuda.device_count())
         self.net = torch.nn.DataParallel(self.net)

@@ -87,7 +87,6 @@ def slice_prostate(image_path, save_path, unit_size):
     for img_fp in glob.iglob(search_path, recursive=True):
         print(img_fp)
 
-
 if __name__ == '__main__':
     image_path = '/data/smb/syh/PycharmProjects/CGC-Net/data_prostate_tcga/data/images/'
     save_path = ''
@@ -150,7 +149,7 @@ if __name__ == '__main__':
         #    grade_id = 3
 
         #print(class_name)
-        fold_folder = 'fold_{}'.format(int(fold_id) + 1)
+        # fold_folder = 'fold_{}'.format(int(fold_id) + 1)
         patch_save_path = os.path.join(dest_path, class_name)
         #print(class_name, grade_id)
         #patch_save_path = os.path.join(cache_path, fold_folder, class_name)
